@@ -96,6 +96,10 @@ c--look for current dump position
       aratio=area/a0
       call setSurfaceTension(aratio)
       call setSlipCondition
+      epsl=1d-4
+  10  call modriver(icyc,epsl,idebug)
+      print *,"init icycle:",icyc
+      if (icyc.gt.10) goto 10
   100 continue
          call clchm(area)
          call cmstpsiz(cmdt,1d-2)
@@ -143,6 +147,11 @@ c--look for current dump position
          print *,"minNet:",minval(svec(1,1,1:ns)),
      1           minval(svec(1,2,1:ns)),minval(svec(1,3,1:ns))
          open(unit=12,file='test_out')
+         do 
+           call modriver(icyc,epsl,idebug)
+           print *,"inside icycle:",icyc
+           if (icyc.lt.10) exit
+         enddo
          call iowrfile(0,12)
          close(12)
          if (isve.eq.1) then
@@ -188,11 +197,11 @@ c--look for current dump position
       use iolibsw 
       afac3=afac**3
       do iq=1,nq
-         gamv(iq)=1d-2*afac3
-         gamd(iq)=1d-2*afac3
+         gamv(iq)=1d-0*afac3
+         gamd(iq)=1d-0*afac3
       enddo
       do il=1,nl
-         game(il)=1d-2*afac3
+         game(il)=1d-0*afac3
       enddo
       return
       end subroutine setSurfaceTension
