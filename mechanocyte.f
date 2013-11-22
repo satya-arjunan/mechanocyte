@@ -1,12 +1,14 @@
       program mechanocyte 
 
       use iolibsw
+      use molibsw
+      use avlibsw
       use cmlibsw
 
       character ipf*20, opf*20, datafile*20
       character fnum*3, suff*3, pref*3
-      real(8) epsl, avdt, cmdt(12),volint, tdump(100),hmax,rmean
-      real(8) logInt,area,volume,height
+      real(8) epsl,avdt,cmdt(12),tdump(100),hmax,rmean
+      real(8) logInt,area,volume,height,r0,a0
       real(8) PIP2m,PIP3m,PIP3a,PI3Km,PTENm,MessV,MessS,ThetV,ThetS
 !
 !--read command line to initialize name of input file
@@ -69,11 +71,11 @@ c--look for current dump position
       print *,'tnext,tstop',tnext,tstop
 
       idphi=0 !phase rub
-      idvis=0 !viscosity
-      idvfx=0 !fixed velocity at boundaries
-      idgam=0 !surface tension
+      idvis=1 !viscosity
+      idvfx=1 !fixed velocity at boundaries
+      idgam=1 !surface tension
       idpsi=0 !network contractility
-      idsfr=0 !surface forces
+      idsfr=1 !surface forces
       idbfr=0 !body forces
       iddrg=0 !drag at boundaries
       idtrc=0 !boundary tractions
@@ -86,8 +88,15 @@ c--look for current dump position
       call iowrfile(0,12)
       close(12)
       idebug=1
+      call setViscosity
+      call getVolume(volume)
+      call getArea(area)
+      r0=(volume*3.0/(4.0*3.141592))**(1./3.)
+      a0=4.0*3.141592*r0**2
+      aratio=area/a0
+      call setSurfaceTension(aratio)
+      call setSlipCondition
   100 continue
-         call getArea(area)
          call clchm(area)
          call cmstpsiz(cmdt,1d-2)
          tstp=min(cmdt(2),cmdt(4))
@@ -99,8 +108,9 @@ c--look for current dump position
             isve=0
          endif
          call dfdriver('eulerian')
+         call avgridmo('lagrangian',0,idebug)
+         call avfield(1,'nw')
          time=time+tstp
-         call getVolume(volume)
          call getSurfaceMolecules(12,PIP2m)
          call getSurfaceMolecules(11,PIP3m)
          call getSurfaceMolecules(10,PIP3a)
@@ -110,6 +120,13 @@ c--look for current dump position
          call getSurfaceMolecules(2,MessS)
          call getVolumeMolecules(1,ThetV)
          call getSurfaceMolecules(1,ThetS)
+         call setViscosity
+         call getVolume(volume)
+         call getArea(area)
+         r0=(volume*3.0/(4.0*3.141592))**(1./3.)
+         a0=4.0*3.141592*r0**2
+         aratio=area/a0
+         call setSurfaceTension(aratio)
          height = volume/area
          print *,"time:",time!,"area:",area,"volume:",volume
          print *,"PIP2m:",int(PIP2m),"PI3Km:",int(PI3Km),"PIP3m:",
@@ -156,10 +173,49 @@ c--look for current dump position
       stop
       end
 
+      subroutine setViscosity
+      use iolibsw
+      do isn=1,ns
+         do lvn=1,3
+            vis(lvn,isn)=1d6*svec(1,lvn,isn)
+         enddo
+      enddo
+      return
+      end subroutine setViscosity
+
+      subroutine setSurfaceTension(afac)
+      use iolibsw 
+      afac3=afac**3
+      do iq=1,nq
+         gamv(iq)=1d-2*afac3
+         gamd(iq)=1d-2*afac3
+      enddo
+      do il=1,nl
+         game(il)=1d-2*afac3
+      enddo
+      return
+      end subroutine setSurfaceTension
+
+      subroutine setSlipCondition
+      USE iolibsw
+      !vfixv is the ventral element's slip condition
+      do iq=1,nq
+         vfixv(1,iq)=1d0 !fix (stick) ventral elements in x direction
+         vfixv(2,iq)=1d0 !fix (stick) ventral elements in y direction
+         vfixv(3,iq)=1d0 !fix (stick) ventral elements in z direction
+      enddo
+
+      do il=1,nl
+         iq = iqol(il)
+         vfixv(1,iq)=0d0 !free (slip) ventral edge elements in x direction
+         vfixv(2,iq)=0d0 !free (slip) ventral edge elements in y direction
+      enddo
+      end subroutine setSlipCondition
+
+
       subroutine setSurfaceField
       USE iolibsw
       real(8) ventral,dorsal,edge
-
       do iq=1,nq
          ventral=0d0
          dorsal=0d0
@@ -182,10 +238,10 @@ c--look for current dump position
          evec(1,il)=edge/6d0
       enddo
       end subroutine setSurfaceField
+
       
       subroutine initMessengerConc 
       USE iolibsw
-
       do isn=1,ns
          do lvn=1,3
             svec(2,lvn,isn) = 0 !messenger
@@ -199,11 +255,11 @@ c--look for current dump position
       enddo
       end subroutine initMessengerConc
 
+
       subroutine getArea(area)
       USE iolibsw
       real(8) area,surfintv,surfintd,surfinte
       real(8),dimension(3,NSM)::cnode=1d0
-
       call gosurfintn(cnode,surfintv,surfintd,surfinte)
       area = surfintv+surfintd+surfinte
       end subroutine getArea
@@ -213,7 +269,6 @@ c--look for current dump position
       USE iolibsw
       real(8) volume
       real(8),dimension(3,NSM)::cnode=1d0
-
       call govolint(cnode,volume)
       end subroutine getVolume
 
@@ -222,7 +277,6 @@ c--look for current dump position
       USE iolibsw
       real(8) cnt,surfintv,surfintd,surfinte
       real(8) cnode(3,NSM)
-
       do i=1,ns
          cnode(1,i)=svec(kom,1,i)
          cnode(2,i)=svec(kom,2,i)
@@ -232,11 +286,11 @@ c--look for current dump position
       cnt = surfintv+surfintd+surfinte
       end subroutine getSurfaceMolecules
 
+
       subroutine getVolumeMolecules(kom, cnt)
       USE iolibsw
       real(8) cnt
       real(8) cnode(3,NSM)
-
       do i=1,ns
          cnode(1,i)=svec(kom,1,i)
          cnode(2,i)=svec(kom,2,i)
@@ -250,7 +304,6 @@ c--look for current dump position
       USE iolibsw
       integer in
       real(8) x,y
-
       do isn=1,ns
          do lvn=1,3
             hvec(1,lvn,isn) = hvec(1,lvn,isn)*1d-5
@@ -260,11 +313,11 @@ c--look for current dump position
       enddo
       end subroutine normalizeCoords
 
+
       subroutine initsvec
       USE iolibsw
       integer in
       real(8) x,y
-
       do isn=1,ns
          do lvn=1,3
             x = (hvec(1,lvn,isn))
