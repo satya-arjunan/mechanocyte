@@ -1,0 +1,11 @@
+FILE=mechanocyte
+for i in $FILE.[0-9][0-9][0-9]; do
+  echo "xgmvsw $i"
+  xgmvsw $i
+  echo "gmvbatch -m -w 0 0 800 450 -a gmv.attr -i rif.gmv -s $i.rgb"
+  gmvbatch -m -w 0 0 800 450 -a gmv.attr -i rif.gmv -s $i.rgb
+  convert -quality 100 $i.rgb $i.jpg
+  rm -f $i.rgb
+done 
+avconv -y -r 5 -i $FILE.%03d.jpg -vcodec qtrle -r 5 $FILE.mov
+vlc $FILE.mov

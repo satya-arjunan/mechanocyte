@@ -1,0 +1,4 @@
+RUN=mechanocyte
+cp $RUN.msh $RUN.000
+make
+$RUN $RUN.000
