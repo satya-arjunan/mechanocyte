@@ -125,8 +125,8 @@
                   do jl=1,3
                      inode=(js-1)*3+jl
                      if (con(inode).lt.0.0) then
-                       print *,'negative concentration,level,stack,kom',
-     1                          con(inode),jl,js,kom
+c                       print *,'negative concentration,level,stack,kom',
+c     1                          con(inode),jl,js,kom
                      endif
                      svec(kom,jl,js)=max(con(inode),vtiny)
                   enddo
@@ -160,8 +160,8 @@
 !
                do inode=1,2*ns+nl
                   if (con(inode).lt.0.0) then
-                     print *,'negative surface concentration,inode,kom',
-     1                        con(inode),inode,kom
+                     !print *,'negative surface concentration,inode,kom',
+                    !         con(inode),inode,kom
                   endif
                enddo 
 !--replace svec(kom,:,:) with new concentrations
@@ -1036,8 +1036,8 @@ c--loop over j and k nodes by stack and level
             enddo
          endif
       enddo
-      print *,'ismin3',ismin3
-      print *,'cmstpz: tstep(1:4)',tstep(1:4)
+      !print *,'ismin3',ismin3
+      !print *,'cmstpz: tstep(1:4)',tstep(1:4)
       tstep=min(tstep,tstp*1.1)
       tstep=max(tstep,tstp*0.9)
       return

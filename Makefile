@@ -1,10 +1,10 @@
 SRC=\
-		iolibswL\
+		iolibswN\
 		lupack\
 		mxlibswD\
 		cmlibswD\
 		molibswE\
-		avlibsw45\
+		avlibswO\
 		mechanocyte
 
 GMVSRC=\
