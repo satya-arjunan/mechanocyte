@@ -4,7 +4,7 @@ SRC=\
 		mxlibswD\
 		cmlibswD\
 		molibswE\
-		avlibswO\
+		avlibsw45\
 		mechanocyte
 
 GMVSRC=\

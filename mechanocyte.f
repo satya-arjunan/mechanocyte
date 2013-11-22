@@ -108,7 +108,8 @@ c--look for current dump position
             isve=0
          endif
          call dfdriver('eulerian')
-         call avgridmo('lagrangian',0,idebug)
+         !call avgridmo('lagrangian',0,idebug)
+         call avgridmo('lagrangian')
          call avfield(1,'nw')
          time=time+tstp
          call getSurfaceMolecules(12,PIP2m)
