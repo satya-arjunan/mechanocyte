@@ -185,9 +185,11 @@ c--look for current dump position
 
       subroutine setViscosity
       use iolibsw
+      !increase viscosity to slow down the rounding
+      viscosity = 5d5
       do isn=1,ns
          do lvn=1,3
-            vis(lvn,isn)=1d6*svec(1,lvn,isn)
+            vis(lvn,isn)=viscosity*svec(1,lvn,isn)
          enddo
       enddo
       return
@@ -195,13 +197,15 @@ c--look for current dump position
 
       subroutine setSurfaceTension(afac)
       use iolibsw 
+      !increase surface_tension to increase the rounding
+      surface_tension = 1d-0
       afac3=afac**3
       do iq=1,nq
-         gamv(iq)=1d-0*afac3
-         gamd(iq)=1d-0*afac3
+         gamv(iq)=surface_tension*afac3
+         gamd(iq)=surface_tension*afac3
       enddo
       do il=1,nl
-         game(il)=1d-0*afac3
+         game(il)=surface_tension*afac3
       enddo
       return
       end subroutine setSurfaceTension
