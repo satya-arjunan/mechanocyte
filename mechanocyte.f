@@ -35,7 +35,7 @@
 !--setup data log file
       datafile=ipf
       datafile(idot+1:idot+3)='dat'
-      open(31,file=datafile,status='new')
+      open(31,file=datafile)
 !
 !--figure out time dumps
 !
@@ -82,8 +82,8 @@ c--look for current dump position
       idhyc=0 !boundary solvent permeability
       !call normalizeCoords
       call initsvec
-      call setSurfaceField
-      call initMessengerConc
+      call setSurfaceField !vvec1
+      call setMessengerConc
       open(unit=12,file='mechanocyte.init')
       call iowrfile(0,12)
       close(12)
@@ -94,8 +94,9 @@ c--look for current dump position
       r0=(volume*3.0/(4.0*3.141592))**(1./3.)
       a0=4.0*3.141592*r0**2
       aratio=area/a0
-      call setSurfaceTension(aratio)
+      call setSurfaceTension(aratio) !clgam
       call setSlipCondition
+      call setSurfaceForce
       epsl=1d-4
   10  call modriver(icyc,epsl,idebug)
       print *,"init icycle:",icyc
@@ -126,6 +127,8 @@ c--look for current dump position
          call getVolumeMolecules(1,ThetV)
          call getSurfaceMolecules(1,ThetS)
          call setViscosity
+         call setMessengerConc
+         call setSurfaceForce
          call getVolume(volume)
          call getArea(area)
          r0=(volume*3.0/(4.0*3.141592))**(1./3.)
@@ -146,6 +149,12 @@ c--look for current dump position
      1           maxval(svec(1,2,1:ns)),maxval(svec(1,3,1:ns))
          print *,"minNet:",minval(svec(1,1,1:ns)),
      1           minval(svec(1,2,1:ns)),minval(svec(1,3,1:ns))
+         print *,"minSFRE:",minval(sfre(:nl))
+         print *,"maxSFRE:",maxval(sfre(:nl))
+         print *,"minSFRV:",minval(sfrv(:nq))
+         print *,"maxSFRV:",maxval(sfrv(:nq))
+         print *,"minSFRD:",minval(sfrd(:nq))
+         print *,"maxSFRD:",maxval(sfrd(:nq))
          open(unit=12,file='test_out')
          do 
            call modriver(icyc,epsl,idebug)
@@ -186,19 +195,21 @@ c--look for current dump position
       subroutine setViscosity
       use iolibsw
       !increase viscosity to slow down the rounding
-      viscosity = 5d5
+      viscosity = 1d6
       do isn=1,ns
          do lvn=1,3
+            !viscosity is proportional to the ThetaN [network=svec(1)]
             vis(lvn,isn)=viscosity*svec(1,lvn,isn)
          enddo
       enddo
       return
       end subroutine setViscosity
 
+
       subroutine setSurfaceTension(afac)
       use iolibsw 
       !increase surface_tension to increase the rounding
-      surface_tension = 1d-0
+      surface_tension = 1d-2
       afac3=afac**3
       do iq=1,nq
          gamv(iq)=surface_tension*afac3
@@ -209,6 +220,7 @@ c--look for current dump position
       enddo
       return
       end subroutine setSurfaceTension
+
 
       subroutine setSlipCondition
       USE iolibsw
@@ -227,7 +239,34 @@ c--look for current dump position
       end subroutine setSlipCondition
 
 
-      subroutine setSurfaceField
+      subroutine setSurfaceForce !clsfr
+      use iolibsw
+      do iq=1,nq
+         sfrv(iq)=0
+         dorsal=0d0
+         do isn=1,4
+            is=isoq(isn,iq)
+            dorsal=dorsal+svec(1,3,is)
+         enddo
+         sfrd(iq)=0.25*dorsal*1d1
+         !sfrd(iq)=0
+      enddo
+      do il=1,nl
+         edge=0d0
+         do isn=1,2
+            is=isol(isn,il)
+            do lv=1,3
+               edge=edge+svec(1,lv,is)
+            enddo
+         enddo
+         sfre(il)=edge/6d0*2d5
+         !sfre(il)=0
+      enddo
+      return
+      end subroutine setSurfaceForce
+
+
+      subroutine setSurfaceField !vvec1
       USE iolibsw
       real(8) ventral,dorsal,edge
       do iq=1,nq
@@ -254,7 +293,7 @@ c--look for current dump position
       end subroutine setSurfaceField
 
       
-      subroutine initMessengerConc 
+      subroutine setMessengerConc 
       USE iolibsw
       do isn=1,ns
          do lvn=1,3
@@ -267,7 +306,7 @@ c--look for current dump position
             endif 
          enddo
       enddo
-      end subroutine initMessengerConc
+      end subroutine setMessengerConc
 
 
       subroutine getArea(area)

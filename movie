@@ -7,5 +7,5 @@ for i in $FILE.[0-9][0-9][0-9]; do
   convert -quality 100 $i.rgb $i.jpg
   rm -f $i.rgb
 done 
-avconv -y -r 80 -i $FILE.%03d.jpg -vcodec qtrle -r 80 $FILE.mov
+avconv -y -r 10 -i $FILE.%03d.jpg -vcodec qtrle -r 10 $FILE.mov
 vlc $FILE.mov
