@@ -241,12 +241,18 @@ c--look for current dump position
 
       subroutine setSurfaceForce !clsfr
       use iolibsw
+      real(8) ThetaEq,Theta0,tau_n
+      Theta0 = 1d-3
+      tau_n = 1d0
+      iThetaN = 1
+      iMess = 2
       do iq=1,nq
          sfrv(iq)=0
          dorsal=0d0
          do isn=1,4
             is=isoq(isn,iq)
-            dorsal=dorsal+svec(1,3,is)
+            ThetaEq=Theta0*(1d0+svec(iMESS,3,is))
+            dorsal=dorsal+svec(iThetaN,3,is)*ThetaEq/tau_n
          enddo
          sfrd(iq)=0.25*dorsal*1d1
          !sfrd(iq)=0
@@ -256,10 +262,11 @@ c--look for current dump position
          do isn=1,2
             is=isol(isn,il)
             do lv=1,3
-               edge=edge+svec(1,lv,is)
+               ThetaEq=Theta0*(1d0+svec(iMESS,lv,is))
+               edge=edge+svec(iThetaN,lv,is)*ThetaEq/tau_n
             enddo
          enddo
-         sfre(il)=edge/6d0*2d5
+         sfre(il)=edge/6d0*1d3
          !sfre(il)=0
       enddo
       return
@@ -418,7 +425,7 @@ c--look for current dump position
       k10 = 0.0001
       k11 = 1d0 !Messenger source rate
       k12 = 1d0 !Messenger decay rate = 1/tau_m
-      tau_n = 1d0
+      tau_n = 2d1
       Theta0 = 1d-3
 
 
