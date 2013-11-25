@@ -243,7 +243,7 @@ c--look for current dump position
       use iolibsw
       real(8) ThetaEq,Theta0,tau_n
       Theta0 = 1d-3
-      tau_n = 1d0
+      tau_n = 1d1
       iThetaN = 1
       iMess = 2
       do iq=1,nq
