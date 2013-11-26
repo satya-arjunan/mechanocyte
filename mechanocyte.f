@@ -1,15 +1,13 @@
-      program hemisw
+      program mechanocyte
 
       use iolibsw
-      use molibsw
-      use avlibsw
       use cmlibsw
-      
+
       character ipf*20, opf*20, datafile*20
       character fnum*3, suff*3, pref*3
-      real(8) epsl, avdt, cmdt(12),volint, tdump(400),hmax,rmean
-      real(8) surfintv,surfintd,surfinte   
-      real(8),dimension(3,NSM)::cnode=1d0
+      real(8) epsl, avdt, cmdt(12),volint, tdump(100),hmax,rmean
+      real(8) logInt,area,volume
+      real(8) PIP2m,PIP3m,PIP3a,PI3Km,PTENm
 !
 !--read command line to initialize name of input file
 !
@@ -39,7 +37,9 @@
 !
 !--figure out time dumps
 !
+      logInt=0
       delt=dscp(3,idfrm)
+      logInt=dscp(4,idfrm)
 !--if delt is zero look for time of dumps in file tdump
       if (delt.eq.zero) then
          open(44,file='tdump',status='old')
@@ -64,10 +64,10 @@ c--look for current dump position
          tnext=tdump(idump)
       else
          tstop=time+delt
-         tnext=time+delt
+         tnext=time+logInt
       endif
       print *,'tnext,tstop',tnext,tstop
-!
+
       idphi=0 !phase rub
       idvis=0 !viscosity
       idvfx=0 !fixed velocity at boundaries
@@ -78,379 +78,280 @@ c--look for current dump position
       iddrg=0 !drag at boundaries
       idtrc=0 !boundary tractions
       idhyc=0 !boundary solvent permeability
-      call clphi
-      call clvis
-      call clpsi
-      call govolint(cnode,volint)
-      call gosurfintn(cnode,surfintv,surfintd,surfinte)
-      tsurf=surfintv+surfintd+surfinte
-      r0=(volint*3.0/(4.0*3.141592))**(1./3.)
-      a0=4.0*3.141592*r0**2
-      aratio=tsurf/a0
-      call clgam(aratio)
-!
-      do iq=1,nq
-         vfixv(1,iq)=1d0
-         vfixv(2,iq)=1d0
-         vfixv(3,iq)=1d0
-      enddo
-      if (time.le.1d-5) then
-         do is=1,ns
-            svec(4,1,is)=max(svec(4,1,is),1d-4)
-         enddo
-         do il=1,nl
-            cxprm(4,il)=1d0
-            cxval(4,il)=2d-1
-!           if (time.lt.5d1) then
-!              cxval(4,il)=2d-1*(1d0+time/1d2)
-!           else
-!              cxval(4,il)=3d-1
-!           endif
-            iq=iqol(il)
-            yq=0d0
-            xq=0d0
-            do isn=1,4
-               is=isoq(isn,iq)
-               xq=xq+hvec(1,1,is)
-               yq=yq+hvec(2,1,is)
-            enddo
-            al=atan(abs(yq)/(abs(xq)+1d-20))*180.0/3.141592
-            if (xq.lt.0d0.or.al.gt.45d0) then
-!           if (xq.lt.0d0) then
-               cxprm(4,il)=0d0
-!              if (al.lt.75d0) then
-!                 vfixv(1,iq)=0d0
-!                 vfixv(2,iq)=0d0
-!              endif
-            endif
-            evec(4,il)=cxprm(4,il)
-         enddo
-      else
-         do il=1,nl
-            cxprm(4,il)=evec(4,il)
-            cxval(4,il)=2d-1
-!           if (time.lt.5d1) then
-!              cxval(4,il)=2d-1*(1d0+time/1d2)
-!           else
-!              cxval(4,il)=3d-1
-!           endif
-         enddo
-      endif
-!
-      call vvec1
-      call clsfr
-!     call clbfr
-!
-      epsl=1d-4
-      idebug=1
-      kount=0
-!  10  call modriver(icyc,epsl,idebug)
-      !kount=kount+1
-      !open(unit=12,file='test_out')
-      !call iowrfile(0,12)
-      !close(12)
-      !if (icyc.gt.10) goto 10
-!     stop
-!
+      !call normalizeCoords
+      call initsvec
+      open(unit=12,file='mechanocyte.init')
+      call iowrfile(0,12)
+      close(12)
       idebug=1
   100 continue
-         vmax=maxval(sqrt(hvec(7,1:3,1:ns)**2+hvec(8,1:3,1:ns)**2+
-     1                                        hvec(9,1:3,1:ns)**2))
-         cnwmin=minval(svec(1,1:3,1:ns))
-         print *,'vmax=',vmax,'  cnwmin=',cnwmin
-         call avtstep(avdt)
-         if (avdt.lt.1d-9) then
-            print *,'small avdt!',avdt
-            stop
-         endif
-         call clchm
-         call vvec1
-         call BC
+         call setSurfaceField
+         call getArea(area)
+         call clchm(area)
          call cmstpsiz(cmdt,1d-2)
+         tstp=min(cmdt(2),cmdt(4))
 !        tstp=cmdt(2)
-!        tstp=min(cmdt(2),cmdt(4))
-!        tstp=min(cmdt(2),2d-2)
-         print *,'chemistry step,advection step',tstp,avdt
-!        print *,'cmdt(1:4)',cmdt(1:4)
-!        tstp=min(avdt,tstp)
-         tstp=avdt
          if (tstp.ge.(tnext-time)) then
             tstp=tnext-time
             isve=1
          else
             isve=0
          endif
-         print *,'advt,tstp',avdt,tstp
-         call dfdriver('lagrangian')
-         call avgridmo('lagrangian')
-         call avfield(1,'nw')
-!        call avfield(2,'ca')
-!        cnode=svec(1,:,:)
-!        call govolint(cnode,volint)
-!        print *,'total network',volint
-!
-         call clphi
-         call clvis
-         call clpsi
-         call vvec1
-         call clsfr
-!        call clbfr
-         call clgam(aratio)
-         call printFile(isuff, ipf, 0)
-         !do 
-         !  call modriver(icyc,epsl,idebug)
-         !  if (icyc.lt.10) exit
-         !  open(unit=12,file='test_out')
-         !  call iowrfile(0,12)
-         !  close(12)
-         !enddo
-!        open(unit=12,file='test_out')
-!        call iowrfile(0,12)
-!        close(12)
-!        stop
-!        call govolint(cnode,volint)
-!        print *,'min zmid/ztop',minval(hvec(3,2,1:ns)/hvec(3,3,1:ns))
-!        print *,'zmin',minval(hvec(3,3,1:ns))
-         alphamin=vbig
-         ratiomn=vbig
-         rmean=0d0
-         rmax=0d0
-         rmin=vbig
-         do il=1,nl
-           is=isol(1,il)
-           dxy=sqrt((hvec(1,2,is)-hvec(1,1,is))**2+
-     1              (hvec(2,2,is)-hvec(2,1,is))**2)
-           dz=hvec(3,2,is)-hvec(3,1,is)
-           rxy=sqrt(hvec(1,1,is)**2+hvec(2,1,is)**2)
-           rmean=rmean+rxy
-           rmax=max(rmax,rxy)
-           rmin=min(rmin,rxy)
-           alpha=atan(dz/dxy)
-           alphamin=min(alpha,alphamin)
-           ratiomn=min(real(hvec(3,2,is)/hvec(3,3,is)),ratiomn)
-         enddo
-         rmean=rmean/nl
-         print *,'alphamin',alphamin*180/3.141592,' ratiomn=',ratiomn
+         call dfdriver('eulerian')
          time=time+tstp
+         !call getVolume(volume)
+               iPIP2 = 12
+      iPIP3 = 11
+      iPIP3a = 10
+      iPTEN = 9
+      iPI3K = 8
+         call getSurfaceMolecules(12,PIP2m)
+         call getSurfaceMolecules(11,PIP3m)
+         call getSurfaceMolecules(10,PIP3a)
+         call getSurfaceMolecules(9,PTENm)
+         call getSurfaceMolecules(8,PI3Km)
+         print *,"time:",time
+         print *,"PIP2m:",int(PIP2m),"PI3Km:",int(PI3Km),"PIP3m:",
+     1           int(PIP3m),"PIP3a:",int(PIP3a),"PTENm:",int(PTENm)
          open(unit=12,file='test_out')
          call iowrfile(0,12)
          close(12)
-         hmax=maxval(hvec(3,3,1:ns))
-         call govolint(cnode,volint)
-         call gosurfintn(cnode,surfintv,surfintd,surfinte)
-         tsurf=surfintv+surfintd+surfinte
-         r0=(volint*3.0/(4.0*3.141592))**(1./3.)
-         a0=4.0*3.141592*r0**2
-         aratio=tsurf/a0
-         print *,'i,volume, aratio, time',i,volint,aratio, time
-         write(31,*) time, rmin,rmax,hmax,volint,aratio
          if (isve.eq.1) then
             isuff=isuff+1
             opf=ipf
             write(fnum,90)isuff
-            print *,'isuff=',isuff
             opf(idot+1:idot+3)=fnum
             open(unit=21,file=opf,status='unknown')
             call iowrfile(0,21)
             close(21)
+!
+!--check if we have reached the end
+!
             if (time.ge.tstop*0.999) then
                print *,'time,tstop',time,tstop
                close(31)
                stop
             else
                idump=idump+1
-               tnext=tdump(idump)
-               print *,'tnext',tnext
+               if (logInt.eq.0) then
+                  tnext=tdump(idump)
+               else
+                  tnext=tnext+logInt
+               endif
             endif
          endif
          goto 100
-!
-!
    90 format(i3.3)
-  131 format(4(a2,1pe9.2))
       stop
       end
-!
-      subroutine printFile(isuff, ipf, isStop)
-      use iolibsw
-      character ipf*20, opf*20, fnum*3
-      idot=index(ipf,'.')
-      isuff=isuff+1
-      opf=ipf
-      write(fnum,90)isuff
-      opf(idot+1:idot+3)=fnum
-      print *, "file name:", opf
-      print *,"time:",time
-      print *,"M4 min svec(4) l:1,2,3:",minval(svec(4,1,1:ns)),
-     1        minval(svec(4,2,1:ns)),minval(svec(4,3,1:ns))
-      print *,"M4 max svec(4) l:1,2,3:",maxval(svec(4,1,1:ns)),
-     1        maxval(svec(4,2,1:ns)),maxval(svec(4,3,1:ns))
-      print *,"MSGR min svec(2) l:1,2,3:",minval(svec(2,1,1:ns)),
-     1        minval(svec(2,2,1:ns)),minval(svec(2,3,1:ns))
-      print *,"MSGR max svec(2) l:1,2,3:",maxval(svec(2,1,1:ns)),
-     1        maxval(svec(2,2,1:ns)),maxval(svec(2,3,1:ns))
-      print *,"ThetaN min svec(1) l:1,2,3:",minval(svec(1,1,1:ns)),
-     1        minval(svec(1,2,1:ns)),minval(svec(1,3,1:ns))
-      print *,"ThetaN max svec(1) l:1,2,3:",maxval(svec(1,1,1:ns)),
-     1        maxval(svec(1,2,1:ns)),maxval(svec(1,3,1:ns))
-      open(unit=21,file=opf,status='unknown')
-      call iowrfile(0,21)
-      close(21)
-      if(isStop.eq.1) then
-        stop
-      endif
-   90 format(i3.3)
-      end subroutine printFile
 
-      subroutine clvis
-      use iolibsw
-      do isn=1,ns
-         do lvn=1,3
-            vis(lvn,isn)=1d6*svec(1,lvn,isn)
-         enddo
-      enddo
-      return
-      end subroutine clvis
-!
-      subroutine clphi
-      use iolibsw
-      do isn=1,ns
-         do lvn=1,3
-            phi(lvn,isn)=1d11*svec(1,lvn,isn)
-         enddo
-      enddo
-      return
-      end subroutine clphi
-!
-      subroutine clpsi
-      use iolibsw
-      do isn=1,ns
-         do lvn=1,3
-            psi(lvn,isn)=-1d5*svec(1,lvn,isn)
-         enddo
-      enddo
-      return
-      end subroutine clpsi
-!
-      subroutine clsfr
-      use iolibsw
-!idsfr=+1
+      subroutine setSurfaceField
+      USE iolibsw
+      real(8) val, val2
+
       do iq=1,nq
-         sfrv(iq)=-4d2*vvec(1,iq)
-         sfrd(iq)=1d1*dvec(1,iq)
-      enddo
-      do il=1,nl
-         sfre(il)=1d1*evec(1,il)
-      enddo
-!     do il=1,nl
-!        iq=iqol(il)
-!        sfrv(iq)=0d0
-!     enddo
-!idsfr=-1
-!     do is=1,ns
-!        sfrn(1,is)=-5d0*svec(4,1,is)
-!        sfrn(3,is)=1d1*svec(2,3,is)*svec(1,3,is)
-!     enddo
-!     do il=1,nl
-!        is=isol(1,il)
-!        sfrn(2,is)=1d1*svec(2,2,is)*svec(1,2,is)
-!        sfrn(1,is)=1d1*svec(2,1,is)*svec(1,1,is)
-!     enddo
-      return
-      end subroutine clsfr
-!
-      subroutine clbfr
-      use iolibsw
-      real(8) volint
-      call govolint(svec(2,:,:),volint)
-      do is=1,ns
-         do lv=1,3
-            bfr(3,lv,is)=-2d-3*svec(2,lv,is)/volint
-         enddo
-      enddo
-      return
-      end subroutine clbfr
-!
-      subroutine clgam(afac)
-      use iolibsw 
-      afac3=afac**3
-      do iq=1,nq
-         gamv(iq)=1d-2*afac3
-         gamd(iq)=1d-2*afac3
-      enddo
-      do il=1,nl
-         game(il)=1d-2*afac3
-      enddo
-      return
-      end subroutine clgam
-!
-      subroutine clchm
-      use iolibsw
-      tautheta=2d0
-      theta0=1d-3
-      taum=1d0
-      do isn=1,ns
-         do lvn=1,3
-            thetaeq=theta0*(svec(2,lvn,isn)+1d0)
-            svec(3,lvn,isn)=thetaeq
-            sdot(1,lvn,isn)=(thetaeq-svec(1,lvn,isn))/
-     1                      (tautheta/svec(2,lvn,isn))
-            sdkr(1,lvn,isn)=-1d0/(tautheta/svec(2,lvn,isn))
-            sdot(2,lvn,isn)=(5d-2-svec(2,lvn,isn))/taum
-            sdkr(2,lvn,isn)=-1d0/taum
-            sdot(4,lvn,isn)=(1d-4-svec(4,lvn,isn))/(2d0*taum)
-            sdkr(4,lvn,isn)=-1d0/(2d0*taum)
-         enddo
-      enddo
-      do il=1,nl
-!        if (time.lt.5d1) then
-!           cxval(4,il)=2d-1*(1d0+time/1d2)
-!        else
-!           cxval(4,il)=3d-1
-!        endif
-         if (cxprm(4,il).eq.0d0.and.cxprm(4,ilol(1,il)).eq.0d0) then
-            isn=isol(1,il)
-            do lvn=1,3
-               sdot(1,lvn,isn)=1.0d0*sdot(1,lvn,isn)
-               sdkr(1,lvn,isn)=1.0d0*sdkr(1,lvn,isn)
-            enddo
-!           print *,'decay time',1/sdkr(1,1,isn)
-         endif
-      enddo
-!         
-      end subroutine clchm
-!
-      subroutine vvec1
-      use iolibsw
-      do iq=1,nq
-         v4=0d0
-         d4=0d0
+         val=0d0
+         val2=0d0
          do isn=1,4
             is=isoq(isn,iq)
-            v4=v4+svec(4,1,is)
-            d4=d4+svec(1,3,is)*svec(2,3,is)
+            val = val+snn(0,1,is)/arean(1,is)
+            val2 = val2+snn(0,3,is)/arean(3,is) 
          enddo
-         vvec(1,iq)=0.25*v4*1d-2
-         dvec(1,iq)=0.25*d4
+         vvec(1,iq)=0.25*val
+         dvec(1,iq)=0.25*val2
       enddo
       do il=1,nl
-         e6=0d0
+         val=0d0
          do isn=1,2
             is=isol(isn,il)
             do lv=1,3
-               e6=e6+svec(1,lv,is)*svec(2,lv,is)
+               val=val+snn(0,lv,is)/arean(lv,is)
             enddo
          enddo
-         evec(1,il)=e6/6d0
+         evec(1,il)=val/6d0
       enddo
-      return
-      end subroutine vvec1
+      end subroutine setSurfaceField
+      
 
-      subroutine BC
+      subroutine getArea(area)
+      USE iolibsw
+      real(8) area,surfintv,surfintd,surfinte
+      real(8),dimension(3,NSM)::cnode=1d0
+
+      call gosurfintn(cnode,surfintv,surfintd,surfinte)
+      area = surfintv+surfintd+surfinte
+      end subroutine getArea
+
+
+      subroutine getVolume(volume)
+      USE iolibsw
+      real(8) volume
+      real(8),dimension(3,NSM)::cnode=1d0
+
+      call govolint(cnode,volume)
+      end subroutine getVolume
+
+
+      subroutine getSurfaceMolecules(kom, cnt)
+      USE iolibsw
+      real(8) cnt,surfintv,surfintd,surfinte
+      real(8) cnode(3,NSM)
+
+      do i=1,ns
+         cnode(1,i)=svec(kom,1,i)
+         cnode(2,i)=svec(kom,2,i)
+         cnode(3,i)=svec(kom,3,i)
+      enddo
+      call gosurfintn(cnode,surfintv,surfintd,surfinte)
+      cnt = surfintv+surfintd+surfinte
+      end subroutine getSurfaceMolecules
+
+      subroutine getVolumeMolecules(kom, cnt)
+      USE iolibsw
+      real(8) cnt
+      real(8) cnode(3,NSM)
+
+      do i=1,ns
+         cnode(1,i)=svec(kom,1,i)
+         cnode(2,i)=svec(kom,2,i)
+         cnode(3,i)=svec(kom,3,i)
+      enddo
+      call govolint(cnode,cnt)
+      end subroutine getVolumeMolecules
+
+
+      subroutine normalizeCoords
+      USE iolibsw
+      integer in
+      real(8) x,y
+
+      do isn=1,ns
+         do lvn=1,3
+            hvec(1,lvn,isn) = hvec(1,lvn,isn)*1d-5
+            hvec(2,lvn,isn) = hvec(2,lvn,isn)*1d-5
+            hvec(3,lvn,isn) = hvec(3,lvn,isn)*1d-5
+         enddo
+      enddo
+      end subroutine normalizeCoords
+
+      subroutine initsvec
+      USE iolibsw
+      integer in
+      real(8) x,y
+
+      do isn=1,ns
+         do lvn=1,3
+            x = (hvec(1,lvn,isn))
+            y = (hvec(2,lvn,isn))
+            !if(x.lt.5d-6) svec(12,lvn,isn) = 1.444605d12 !PIP2m
+            if(y.lt.2.5d-6) then
+               svec(12,lvn,isn) = 1.277d13 !PIP2m
+               svec(9,lvn,isn) = 0.627d12 !PTENm
+            endif
+            if(x.lt.-6d-6) then
+               svec(8,lvn,isn) = 3.8546d13 !PI3Km
+            endif
+         enddo
+      enddo
+      end subroutine initsvec
+
+
+      subroutine clchm(area)
       use iolibsw
-      do iq=1,nq
-         vxsrc(2,iq)=vvec(1,iq)
-      enddo
-      return
-      end subroutine BC
+      integer in,iPIP2,iPIP3,iPIP3a,iPI3K,iPTEN
+      real(8) PIPtc,PTENtc,PI3Ktc
+      real(8) PIP2m,PIP3m,PIP3a,PI3Km,PTENm
+      real(8) PIP2,PI3K,PTEN,maxConc,new,area,val
+      real(8) k1,k2,k3,k4,k5,k6,k7,k8,k9,k10
 
+      iPIP2 = 12
+      iPIP3 = 11
+      iPIP3a = 10
+      iPTEN = 9
+      iPI3K = 8
+
+      k1 = 4d-2
+      k2 = 2d-14
+      k3 = 2d-13
+      k4 = 4d-14
+      k5 = 2d-14
+      k6 = 5d-14
+      k7 = 5d-14
+      k8 = 0.09
+      k9 = 0.02
+      k10 = 0.0001
+      maxConc = 8.7816d13
+      PIPtc = 1.089171d13
+      PTENtc = 7.62666d12
+      PI3Ktc = 1.44957d13
+
+      call getSurfaceMolecules(iPIP2,val)
+      PIP2 = val
+      call getSurfaceMolecules(iPIP3,val)
+      PIP2 = PIP2 + val
+      call getSurfaceMolecules(iPIP3a,val)
+      PIP2 = PIP2 + val
+      PIP2 = PIPtc-PIP2/area 
+
+      call getSurfaceMolecules(iPI3K,PI3K)
+      PI3K = PI3Ktc-PI3K/area
+
+      call getSurfaceMolecules(iPTEN,PTEN)
+      PTEN = PTENtc-PTEN/area
+c      print *,"PTEN:",int(PTEN*area),"PI3K:",int(PI3K*area),
+c     1        "PIP2:",int(PIP2*area)
+
+      do isn=1,ns
+         do lvn=1,3
+            PIP2m = svec(iPIP2,lvn,isn)
+            PIP3m = svec(iPIP3,lvn,isn)
+            PIP3a = svec(iPIP3a,lvn,isn)
+            PTENm = svec(iPTEN,lvn,isn)
+            PI3Km = svec(iPI3K,lvn,isn)
+
+            sdot(iPIP2,lvn,isn) = k1*PIP2-k5*PIP2m*PI3Km+k6*PIP3m*PTENm+
+     1                            k7*PIP3a*PTENm-k10*PIP2m
+            sdkr(iPIP2,lvn,isn) = -k5*PI3Km-k10
+            new = PIP2m + sdot(iPIP2,lvn,isn)*tstp
+            if (new.gt.maxConc) then
+              sdot(iPIP2,lvn,isn) = 0
+              sdkr(iPIP2,lvn,isn) = 0
+            endif
+
+            sdot(iPTEN,lvn,isn) = k2*PTEN*PIP2m-k8*PTENm
+            sdkr(iPTEN,lvn,isn) = -k8
+            new = PTENm + sdot(iPTEN,lvn,isn)*tstp
+            if (new.gt.maxConc) then
+              sdot(iPTEN,lvn,isn) = 0
+              sdkr(iPTEN,lvn,isn) = 0
+            endif
+
+            sdot(iPIP3a,lvn,isn) = -k3*PIP3a*PI3K+k4*PIP3m*PIP3m-
+     1                             k7*PIP3a*PTENm-k9*PIP3a
+            sdkr(iPIP3a,lvn,isn) = -k3*PI3k-k7*PTENm-k9
+            new = PIP3a + sdot(iPIP3a,lvn,isn)*tstp
+            if (new.gt.maxConc) then
+              sdot(iPIP3a,lvn,isn) = 0
+              sdkr(iPIP3a,lvn,isn) = 0
+            endif
+
+            sdot(iPIP3,lvn,isn) = k3*PIP3a*PI3K-k4*PIP3m*PIP3m+
+     1                             k5*PIP2m*PI3Km-k6*PIP3m*PTENm-
+     2                             k9*PIP3m
+            sdkr(iPIP3,lvn,isn) = -2*k4*PIP3m-k6*PTENm-k9
+            new = PIP3m + sdot(iPIP3,lvn,isn)*tstp
+            if (new.gt.maxConc) then
+              sdot(iPIP3,lvn,isn) = 0
+              sdkr(iPIP3,lvn,isn) = 0
+            endif
+
+            sdot(iPI3K,lvn,isn) = k3*PIP3a*PI3K-k9*PI3Km
+            sdkr(iPI3K,lvn,isn) = -k9
+            new = PI3Km + sdot(iPI3K,lvn,isn)*tstp
+            if (new.gt.maxConc) then
+              sdot(iPI3K,lvn,isn) = 0
+              sdkr(iPI3K,lvn,isn) = 0
+            endif
+         enddo
+      enddo
+      end subroutine clchm
