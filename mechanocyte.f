@@ -1,13 +1,15 @@
-      program mechanocyte
+      program mechanocyte 
 
       use iolibsw
+      use molibsw
+      use avlibsw
       use cmlibsw
 
       character ipf*20, opf*20, datafile*20
       character fnum*3, suff*3, pref*3
-      real(8) epsl, avdt, cmdt(12),volint, tdump(100),hmax,rmean
-      real(8) logInt,area,volume
-      real(8) PIP2m,PIP3m,PIP3a,PI3Km,PTENm
+      real(8) epsl,avdt,cmdt(12),tdump(100),hmax,rmean
+      real(8) logInt,area,volume,height,r0,a0
+      real(8) PIP2m,PIP3m,PIP3a,PI3Km,PTENm,MessV,MessS,ThetV,ThetS
 !
 !--read command line to initialize name of input file
 !
@@ -33,7 +35,7 @@
 !--setup data log file
       datafile=ipf
       datafile(idot+1:idot+3)='dat'
-      open(31,file=datafile,status='unknown')
+      open(31,file=datafile)
 !
 !--figure out time dumps
 !
@@ -80,17 +82,28 @@ c--look for current dump position
       idhyc=0 !boundary solvent permeability
       !call normalizeCoords
       call initsvec
+      !call setMessengerConc
       open(unit=12,file='mechanocyte.init')
       call iowrfile(0,12)
       close(12)
       idebug=1
+      !call setViscosity
+      call getVolume(volume)
+      call getArea(area)
+      r0=(volume*3.0/(4.0*3.141592))**(1./3.)
+      a0=4.0*3.141592*r0**2
+      aratio=area/a0
+      !call setSurfaceTension(aratio) !clgam
+      !call setSlipCondition
+      !call setSurfaceForce
+      epsl=1d-4
+!  10  call modriver(icyc,epsl,idebug)
+      !print *,"init icycle:",icyc
+      !if (icyc.gt.10) goto 10
   100 continue
-         call setSurfaceField
-         call getArea(area)
          call clchm(area)
          call cmstpsiz(cmdt,1d-2)
          tstp=min(cmdt(2),cmdt(4))
-!        tstp=cmdt(2)
          if (tstp.ge.(tnext-time)) then
             tstp=tnext-time
             isve=1
@@ -98,22 +111,38 @@ c--look for current dump position
             isve=0
          endif
          call dfdriver('eulerian')
+         !call avgridmo('lagrangian',0,idebug)
+         !call avgridmo('lagrangian')
+         !call avfield(1,'nw')
          time=time+tstp
-         !call getVolume(volume)
-               iPIP2 = 12
-      iPIP3 = 11
-      iPIP3a = 10
-      iPTEN = 9
-      iPI3K = 8
          call getSurfaceMolecules(12,PIP2m)
          call getSurfaceMolecules(11,PIP3m)
          call getSurfaceMolecules(10,PIP3a)
          call getSurfaceMolecules(9,PTENm)
          call getSurfaceMolecules(8,PI3Km)
-         print *,"time:",time
+         call getVolumeMolecules(2,MessV)
+         call getSurfaceMolecules(2,MessS)
+         call getVolumeMolecules(1,ThetV)
+         call getSurfaceMolecules(1,ThetS)
+         !call setViscosity
+         !call setMessengerConc
+         !call setSurfaceForce
+         call getVolume(volume)
+         call getArea(area)
+         r0=(volume*3.0/(4.0*3.141592))**(1./3.)
+         a0=4.0*3.141592*r0**2
+         aratio=area/a0
+         !call setSurfaceTension(aratio)
+         height = volume/area
+         print *,"time:",time!,"area:",area,"volume:",volume
          print *,"PIP2m:",int(PIP2m),"PI3Km:",int(PI3Km),"PIP3m:",
      1           int(PIP3m),"PIP3a:",int(PIP3a),"PTENm:",int(PTENm)
          open(unit=12,file='test_out')
+         !do 
+         !  call modriver(icyc,epsl,idebug)
+         !  print *,"inside icycle:",icyc
+         !  if (icyc.lt.10) exit
+         !enddo
          call iowrfile(0,12)
          close(12)
          if (isve.eq.1) then
@@ -145,39 +174,134 @@ c--look for current dump position
       stop
       end
 
-      subroutine setSurfaceField
-      USE iolibsw
-      real(8) val, val2
-
-      do iq=1,nq
-         val=0d0
-         val2=0d0
-         do isn=1,4
-            is=isoq(isn,iq)
-            val = val+snn(0,1,is)/arean(1,is)
-            val2 = val2+snn(0,3,is)/arean(3,is) 
+      subroutine setViscosity
+      use iolibsw
+      !increase viscosity to slow down the rounding
+      viscosity = 1d6
+      do isn=1,ns
+         do lvn=1,3
+            !viscosity is proportional to the ThetaN [network=svec(1)]
+            vis(lvn,isn)=viscosity*svec(1,lvn,isn)
          enddo
-         vvec(1,iq)=0.25*val
-         dvec(1,iq)=0.25*val2
+      enddo
+      return
+      end subroutine setViscosity
+
+
+      subroutine setSurfaceTension(afac)
+      use iolibsw 
+      !increase surface_tension to increase the rounding
+      surface_tension = 1d-2
+      afac3=afac**3
+      do iq=1,nq
+         gamv(iq)=surface_tension*afac3
+         gamd(iq)=surface_tension*afac3
       enddo
       do il=1,nl
-         val=0d0
+         game(il)=surface_tension*afac3
+      enddo
+      return
+      end subroutine setSurfaceTension
+
+
+      subroutine setSlipCondition
+      USE iolibsw
+      !vfixv is the ventral element's slip condition
+      do iq=1,nq
+         vfixv(1,iq)=1d0 !fix (stick) ventral elements in x direction
+         vfixv(2,iq)=1d0 !fix (stick) ventral elements in y direction
+         vfixv(3,iq)=1d0 !fix (stick) ventral elements in z direction
+      enddo
+
+      do il=1,nl
+         iq = iqol(il)
+         vfixv(1,iq)=0d0 !free (slip) ventral edge elements in x direction
+         vfixv(2,iq)=0d0 !free (slip) ventral edge elements in y direction
+      enddo
+      end subroutine setSlipCondition
+
+
+      subroutine setSurfaceForce !clsfr
+      use iolibsw
+      real(8) ThetaEq,Theta0,tau_n
+      Theta0 = 1d-3
+      tau_n = 1d1
+      iThetaN = 1
+      iMess = 2
+      do iq=1,nq
+         sfrv(iq)=0
+         dorsal=0d0
+         do isn=1,4
+            is=isoq(isn,iq)
+            ThetaEq=Theta0*(1d0+svec(iMESS,3,is))
+            dorsal=dorsal+svec(iThetaN,3,is)*ThetaEq/tau_n
+         enddo
+         sfrd(iq)=0.25*dorsal*1d1
+         !sfrd(iq)=0
+      enddo
+      do il=1,nl
+         edge=0d0
          do isn=1,2
             is=isol(isn,il)
             do lv=1,3
-               val=val+snn(0,lv,is)/arean(lv,is)
+               ThetaEq=Theta0*(1d0+svec(iMESS,lv,is))
+               edge=edge+svec(iThetaN,lv,is)*ThetaEq/tau_n
             enddo
          enddo
-         evec(1,il)=val/6d0
+         sfre(il)=edge/6d0*1d3
+         !sfre(il)=0
+      enddo
+      return
+      end subroutine setSurfaceForce
+
+
+      subroutine setSurfaceField !vvec1
+      USE iolibsw
+      real(8) ventral,dorsal,edge
+      do iq=1,nq
+         ventral=0d0
+         dorsal=0d0
+         do isn=1,4
+            is=isoq(isn,iq)
+            ventral = ventral+snn(0,1,is)/arean(1,is)
+            dorsal = dorsal+snn(0,3,is)/arean(3,is) 
+         enddo
+         vvec(1,iq)=0.25*ventral
+         dvec(1,iq)=0.25*dorsal
+      enddo
+      do il=1,nl
+         edge=0d0
+         do isn=1,2
+            is=isol(isn,il)
+            do lv=1,3
+               edge=edge+snn(0,lv,is)/arean(lv,is)
+            enddo
+         enddo
+         evec(1,il)=edge/6d0
       enddo
       end subroutine setSurfaceField
+
       
+      subroutine setMessengerConc 
+      USE iolibsw
+      do isn=1,ns
+         do lvn=1,3
+            svec(2,lvn,isn) = 0 !messenger
+            svec(4,lvn,isn) = 0 !curvature
+            if(arean(lvn,isn).gt.0) then
+               !set the messenger to be ~20 at the highly curved region:
+               svec(4,lvn,isn) = snn(0,lvn,isn)/arean(lvn,isn)*6.6173d-5
+               svec(2,lvn,isn) = svec(4,lvn,isn)
+            endif 
+         enddo
+      enddo
+      end subroutine setMessengerConc
+
 
       subroutine getArea(area)
       USE iolibsw
       real(8) area,surfintv,surfintd,surfinte
       real(8),dimension(3,NSM)::cnode=1d0
-
       call gosurfintn(cnode,surfintv,surfintd,surfinte)
       area = surfintv+surfintd+surfinte
       end subroutine getArea
@@ -187,7 +311,6 @@ c--look for current dump position
       USE iolibsw
       real(8) volume
       real(8),dimension(3,NSM)::cnode=1d0
-
       call govolint(cnode,volume)
       end subroutine getVolume
 
@@ -196,7 +319,6 @@ c--look for current dump position
       USE iolibsw
       real(8) cnt,surfintv,surfintd,surfinte
       real(8) cnode(3,NSM)
-
       do i=1,ns
          cnode(1,i)=svec(kom,1,i)
          cnode(2,i)=svec(kom,2,i)
@@ -206,11 +328,11 @@ c--look for current dump position
       cnt = surfintv+surfintd+surfinte
       end subroutine getSurfaceMolecules
 
+
       subroutine getVolumeMolecules(kom, cnt)
       USE iolibsw
       real(8) cnt
       real(8) cnode(3,NSM)
-
       do i=1,ns
          cnode(1,i)=svec(kom,1,i)
          cnode(2,i)=svec(kom,2,i)
@@ -224,7 +346,6 @@ c--look for current dump position
       USE iolibsw
       integer in
       real(8) x,y
-
       do isn=1,ns
          do lvn=1,3
             hvec(1,lvn,isn) = hvec(1,lvn,isn)*1d-5
@@ -234,11 +355,11 @@ c--look for current dump position
       enddo
       end subroutine normalizeCoords
 
+
       subroutine initsvec
       USE iolibsw
       integer in
       real(8) x,y
-
       do isn=1,ns
          do lvn=1,3
             x = (hvec(1,lvn,isn))
@@ -258,17 +379,21 @@ c--look for current dump position
 
       subroutine clchm(area)
       use iolibsw
-      integer in,iPIP2,iPIP3,iPIP3a,iPI3K,iPTEN
+      integer in,iPIP2,iPIP3,iPIP3a,iPI3K,iPTEN,iMESS,iCURV,iThetaN
       real(8) PIPtc,PTENtc,PI3Ktc
-      real(8) PIP2m,PIP3m,PIP3a,PI3Km,PTENm
+      real(8) PIP2m,PIP3m,PIP3a,PI3Km,PTENm,MESS,CURV,ThetaN
       real(8) PIP2,PI3K,PTEN,maxConc,new,area,val
-      real(8) k1,k2,k3,k4,k5,k6,k7,k8,k9,k10
+      real(8) k1,k2,k3,k4,k5,k6,k7,k8,k9,k10,k11,k12
+      real(8) ThetaEq,Theta0,tau_n
 
       iPIP2 = 12
       iPIP3 = 11
       iPIP3a = 10
       iPTEN = 9
       iPI3K = 8
+      iCURV = 4
+      iMESS = 2
+      iThetaN = 1
 
       k1 = 4d-2
       k2 = 2d-14
@@ -280,6 +405,12 @@ c--look for current dump position
       k8 = 0.09
       k9 = 0.02
       k10 = 0.0001
+      k11 = 1d0 !Messenger source rate
+      k12 = 1d0 !Messenger decay rate = 1/tau_m
+      tau_n = 2d1
+      Theta0 = 1d-3
+
+
       maxConc = 8.7816d13
       PIPtc = 1.089171d13
       PTENtc = 7.62666d12
@@ -308,6 +439,20 @@ c     1        "PIP2:",int(PIP2*area)
             PIP3a = svec(iPIP3a,lvn,isn)
             PTENm = svec(iPTEN,lvn,isn)
             PI3Km = svec(iPI3K,lvn,isn)
+            MESS = svec(iMESS,lvn,isn)
+            CURV = svec(iCURV,lvn,isn)
+            ThetaN = svec(iThetaN,lvn,isn)
+
+            !Source and decay messenger
+            sdot(iMESS,lvn,isn) = k11*CURV-k12*MESS
+            sdkr(iMESS,lvn,isn) = -k12
+
+            !Create network
+            ThetaEq=Theta0*(1d0+MESS)
+            sdot(iThetaN,lvn,isn) = (ThetaEq-ThetaN)*MESS/tau_n
+            sdkr(iThetaN,lvn,isn) = -MESS/tau_n
+
+
 
             sdot(iPIP2,lvn,isn) = k1*PIP2-k5*PIP2m*PI3Km+k6*PIP3m*PTENm+
      1                            k7*PIP3a*PTENm-k10*PIP2m
