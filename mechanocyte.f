@@ -74,7 +74,7 @@ c--look for current dump position
       idvis=1 !viscosity
       idvfx=1 !fixed velocity at boundaries
       idgam=1 !surface tension
-      idpsi=0 !network contractility
+      idpsi=1 !network contractility
       idsfr=1 !surface forces
       idbfr=0 !body forces
       iddrg=0 !drag at boundaries
@@ -89,6 +89,7 @@ c--look for current dump position
       idebug=0
       call setPhaserub
       call setViscosity
+      call setNetworkContractility
       call getVolume(volume)
       call getArea(area)
       r0=(volume*3.0/(4.0*3.141592))**(1./3.)
@@ -119,7 +120,9 @@ c--look for current dump position
          call avfield(1,'nw')
          time=time+tstp
          print *,"time:",time
+         call setPhaserub
          call setViscosity
+         call setNetworkContractility
          call getVolume(volume)
          call getArea(area)
          r0=(volume*3.0/(4.0*3.141592))**(1./3.)
@@ -191,6 +194,10 @@ c--look for current dump position
      1        minval(phi(2,1:ns)),minval(phi(3,1:ns))
       print *,"phaserub max phi() l:1,2,3:",maxval(phi(1,1:ns)),
      1        maxval(phi(2,1:ns)),maxval(phi(3,1:ns))
+      print *,"netcontract min psi() l:1,2,3:",minval(psi(1,1:ns)),
+     1        minval(psi(2,1:ns)),minval(psi(3,1:ns))
+      print *,"netcontract max psi() l:1,2,3:",maxval(psi(1,1:ns)),
+     1        maxval(psi(2,1:ns)),maxval(psi(3,1:ns))
       print *,"surf tension min gam() v,d,e:",minval(gamv(1:nq)),
      1        minval(gamd(1:nq)),minval(game(1:nl))
       print *,"surf tension max gam() v,d,e:",maxval(gamv(1:nq)),
@@ -218,13 +225,12 @@ c--look for current dump position
       subroutine setViscosity
       use iolibsw
       !increase viscosity to slow down the rounding
-      real(8) minVis
+      real(8) viscosity, minVis
       viscosity = 4.1d1
       minVis = viscosity*0.8d+13
       iThetaN = 12
       do isn=1,ns
          do lvn=1,3
-            !vis(lvn,isn)=max(viscosity*svec(iThetaN,lvn,isn), minVis)
             vis(lvn,isn)=max(viscosity*svec(iThetaN,lvn,isn), minVis)
          enddo
       enddo
@@ -233,14 +239,31 @@ c--look for current dump position
 
       subroutine setPhaserub
       use iolibsw
-      phaserub = 1d6
+      real(8) phaserub, minPhi
+      phaserub = 1d-5
+      minPhi = phaserub*9d+14
+      iThetaN = 12
       do isn=1,ns
          do lvn=1,3
-            phi(lvn,isn)=max(phaserub*svec(4,lvn,isn), 97414015d-1)
+            phi(lvn,isn)=max(phaserub*svec(iThetaN,lvn,isn), minPhi)
          enddo
       enddo
       return
       end subroutine setPhaserub
+
+      subroutine setNetworkContractility
+      use iolibsw
+      real(8) netcontract, minNet
+      netcontract = 1d-10
+      minNet = netcontract*9d14
+      iThetaN = 12
+      do isn=1,ns
+         do lvn=1,3
+            psi(lvn,isn)=max(netcontract*svec(iThetaN,lvn,isn), minNet)
+         enddo
+      enddo
+      return
+      end subroutine setNetworkContractility
 
 
       subroutine setSurfaceTension(afac)
