@@ -23,13 +23,13 @@
 !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !      
-      subroutine avgridmo(opt)
+      subroutine avgridmo(opt,idebug)
 !
 ! This subroutine displaces the grid
 !
       real(8) volzr(3,NSM), areazr(3,NSM)
       real(8) dt
-      integer nadv,iflag,imx(2)
+      integer nadv,iflag,imx(2),idebug
       character*(*) opt !='eul', or 'lag'
 !
       dt=tstp
@@ -99,7 +99,7 @@
          if (iflagd.ne.0) call edgadv(xfn,nadv)
 !        print *,'post-edgadv2 xfn(3,3,547)',xfn(3,3,547)
 !
-         call rezdriver(xfn)!rezone the grid
+         call rezdriver(xfn, idebug)!rezone the grid
          call godriver(xfn)
          irezfix=0
 !
@@ -466,7 +466,7 @@
 !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-      subroutine rezdriver(xn)
+      subroutine rezdriver(xn, idebug)
 !
 ! this subroutine is the driver for the rezoning of the mesh
 !
@@ -476,7 +476,7 @@
 !
       real(8) reztol
       parameter(reztol=1d-3)
-      integer icmx
+      integer icmx,idebug
       parameter(icmx=500)
       integer icyc,is,lv,iflag
       real(8) c_newton,dratio,volint,wtot1,wtot2,dwtot,dd
@@ -491,7 +491,7 @@
          if (dd.lt.0.1d0*reztol.and.icyc.gt.3) exit
          call goquick(xn)
       enddo
-      print *,'rezcl: dd, icyc',dd,icyc
+      if (idebug.ge.1) print *,'rezcl: dd, icyc',dd,icyc
       if (icyc.ge.icmx) print *,'rezcl warning',dd
       call godriver(xn)
 !     call govolint(cnode,volint)
@@ -523,7 +523,7 @@
         if (dwtot.lt.reztol/nq.and.icyc.gt.3) exit
         wtot1=wtot2
       enddo
-      print *,'rezbot: wtot2, icyc',wtot2,icyc
+      if (idebug.ge.1) print *,'rezbot: wtot2, icyc',wtot2,icyc
       if (icyc.ge.icmx) print *,'rezdriver warning',dratio
 !
       c_newton=0.5d0 !under-relaxation 
@@ -540,7 +540,7 @@
         wtot1=wtot2
       enddo
 !     print *,'post-rezback xn(3,3,547)',xn(3,3,547)
-      print *,'rezback: wtot2, icyc',wtot2,icyc
+      if (idebug.ge.1) print *,'rezback: wtot2, icyc',wtot2,icyc
       if (icyc.ge.icmx) print *,'rezdriver warning',dratio
 !
       c_newton=0.5d0 !under-relaxation 
@@ -555,7 +555,7 @@
         if (dwtot.lt.reztol/nq.and.icyc.gt.3) exit
         wtot1=wtot2
       enddo
-      print *,'rezone: wtot2, icyc',wtot2,icyc
+      if (idebug.ge.1) print *,'rezone: wtot2, icyc',wtot2,icyc
       if (icyc.ge.icmx) print *,'rezdriver warning',dratio
 !
       return

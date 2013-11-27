@@ -81,13 +81,12 @@ c--look for current dump position
       idtrc=0 !boundary tractions
       idhyc=0 !boundary solvent permeability
       !call normalizeCoords
+      !call writeInitMeshFile
+      !stop
       call initsvec
       call setSurfaceField
       call initMessengerConc
-      open(unit=12,file='mechanocyte.init')
-      call iowrfile(0,12)
-      close(12)
-      idebug=1
+      idebug=0
       call setPhaserub
       call setViscosity
       call getVolume(volume)
@@ -115,18 +114,10 @@ c--look for current dump position
          endif
          call dfdriver('eulerian')
          !call avgridmo('lagrangian',0,idebug)
-         call avgridmo('lagrangian')
+         call avgridmo('lagrangian',idebug)
          call avfield(1,'nw')
          time=time+tstp
-         call getSurfaceMolecules(12,PIP2m)
-         call getSurfaceMolecules(11,PIP3m)
-         call getSurfaceMolecules(10,PIP3a)
-         call getSurfaceMolecules(9,PTENm)
-         call getSurfaceMolecules(8,PI3Km)
-         call getVolumeMolecules(2,MessV)
-         call getSurfaceMolecules(2,MessS)
-         call getVolumeMolecules(1,ThetV)
-         call getSurfaceMolecules(1,ThetS)
+         print *,"time:",time
          call setViscosity
          call getVolume(volume)
          call getArea(area)
@@ -135,43 +126,33 @@ c--look for current dump position
          aratio=area/a0
          call setSurfaceTension(aratio)
          height = volume/area
-         call printFile(isuff, ipf, 0)
          open(unit=12,file='test_out')
          do 
            call modriver(icyc,epsl,idebug)
-           print *,"inside icycle:",icyc
            if (icyc.lt.10) exit
          enddo
          call iowrfile(0,12)
          close(12)
          if (isve.eq.1) then
-            isuff=isuff+1
-            opf=ipf
-            write(fnum,90)isuff
-            opf(idot+1:idot+3)=fnum
-            open(unit=21,file=opf,status='unknown')
-            call iowrfile(0,21)
-            close(21)
-!
-!--check if we have reached the end
-!
-            if (time.ge.tstop*0.999) then
-               print *,'time,tstop',time,tstop
-               close(31)
-               stop
-            else
-               idump=idump+1
-               if (logInt.eq.0) then
-                  tnext=tdump(idump)
-               else
-                  tnext=tnext+logInt
-               endif
-            endif
+           call printFile(isuff,ipf,0)
+           if (time.ge.tstop*0.999) then
+              print *,'time,tstop',time,tstop
+              close(31)
+              stop
+           else
+              idump=idump+1
+              if (logInt.eq.0) then
+                 tnext=tdump(idump)
+              else
+                 tnext=tnext+logInt
+              endif
+           endif
          endif
          goto 100
    90 format(i3.3)
       stop
       end
+
 
       subroutine printFile(isuff, ipf, isStop)
       use iolibsw
@@ -183,6 +164,11 @@ c--look for current dump position
       opf(idot+1:idot+3)=fnum
       print *, "file name:", opf
       print *,"time:",time
+            hvec(1,lvn,isn) = hvec(1,lvn,isn)*1d-5
+      print *,"min x, y, z:",minval(hvec(1,1:3,1:ns)),
+     1        minval(hvec(2,1:3,1:ns)),minval(hvec(3,1:3,1:ns))
+      print *,"max x, y, z:",maxval(hvec(1,1:3,1:ns)),
+     1        maxval(hvec(2,1:3,1:ns)),maxval(hvec(3,1:3,1:ns))
       print *,"Curve min svec(4) l:1,2,3:",minval(svec(4,1,1:ns)),
      1        minval(svec(4,2,1:ns)),minval(svec(4,3,1:ns))
       print *,"Curve max svec(4) l:1,2,3:",maxval(svec(4,1,1:ns)),
@@ -216,13 +202,20 @@ c--look for current dump position
    90 format(i3.3)
       end subroutine printFile
 
+      subroutine writeInitMeshFile
+      use iolibsw
+      open(unit=12,file='mechanocyte.init')
+      call iowrfile(0,12)
+      close(12)
+      end subroutine writeInitMeshFile
+
       subroutine setViscosity
       use iolibsw
       !increase viscosity to slow down the rounding
-      viscosity = 4.39d2
+      viscosity = 4.39d13
       do isn=1,ns
          do lvn=1,3
-            vis(lvn,isn)=max(viscosity*svec(4,lvn,isn), 1238d0)
+            vis(lvn,isn)=max(viscosity*svec(4,lvn,isn), 1238d11)
          enddo
       enddo
       return
@@ -244,7 +237,7 @@ c--look for current dump position
       use iolibsw 
       !increase surface_tension to increase the rounding
       !decrease surface tension to increase time steps
-      surface_tension = 0.0111d0
+      surface_tension = 0.0111d-2
       afac3=afac**3
       do iq=1,nq
          gamv(iq)=surface_tension*afac3
@@ -366,9 +359,9 @@ c--look for current dump position
       real(8) x,y
       do isn=1,ns
          do lvn=1,3
-            hvec(1,lvn,isn) = hvec(1,lvn,isn)*1d-5
-            hvec(2,lvn,isn) = hvec(2,lvn,isn)*1d-5
-            hvec(3,lvn,isn) = hvec(3,lvn,isn)*1d-5
+            hvec(1,lvn,isn) = hvec(1,lvn,isn)*0.8
+            hvec(2,lvn,isn) = hvec(2,lvn,isn)*0.8
+            hvec(3,lvn,isn) = hvec(3,lvn,isn)*0.5
          enddo
       enddo
       end subroutine normalizeCoords
