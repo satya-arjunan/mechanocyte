@@ -35,7 +35,7 @@
 !--setup data log file
       datafile=ipf
       datafile(idot+1:idot+3)='dat'
-      open(31,file=datafile)
+      open(31,file=datafile,status='unknown')
 !
 !--figure out time dumps
 !
@@ -70,10 +70,10 @@ c--look for current dump position
       endif
       print *,'tnext,tstop',tnext,tstop
 
-      idphi=0 !phase rub
-      idvis=0 !viscosity
-      idvfx=0 !fixed velocity at boundaries
-      idgam=0 !surface tension
+      idphi=1 !phase rub
+      idvis=1 !viscosity
+      idvfx=1 !fixed velocity at boundaries
+      idgam=1 !surface tension
       idpsi=0 !network contractility
       idsfr=0 !surface forces
       idbfr=0 !body forces
@@ -82,28 +82,31 @@ c--look for current dump position
       idhyc=0 !boundary solvent permeability
       !call normalizeCoords
       call initsvec
-      !call setMessengerConc
+      call setSurfaceField
+      call initMessengerConc
       open(unit=12,file='mechanocyte.init')
       call iowrfile(0,12)
       close(12)
       idebug=1
-      !call setViscosity
+      call setPhaserub
+      call setViscosity
       call getVolume(volume)
       call getArea(area)
       r0=(volume*3.0/(4.0*3.141592))**(1./3.)
       a0=4.0*3.141592*r0**2
       aratio=area/a0
-      !call setSurfaceTension(aratio) !clgam
-      !call setSlipCondition
-      !call setSurfaceForce
+      call setSurfaceTension(aratio)
+      call setSlipCondition
       epsl=1d-4
-!  10  call modriver(icyc,epsl,idebug)
-      !print *,"init icycle:",icyc
-      !if (icyc.gt.10) goto 10
+      call printFile(isuff, ipf, 0)
+  10  call modriver(icyc,epsl,idebug)
+      print *,"init icycle:",icyc
+      if (icyc.gt.10) goto 10
   100 continue
          call clchm(area)
          call cmstpsiz(cmdt,1d-2)
          tstp=min(cmdt(2),cmdt(4))
+!        tstp=cmdt(2)
          if (tstp.ge.(tnext-time)) then
             tstp=tnext-time
             isve=1
@@ -112,8 +115,8 @@ c--look for current dump position
          endif
          call dfdriver('eulerian')
          !call avgridmo('lagrangian',0,idebug)
-         !call avgridmo('lagrangian')
-         !call avfield(1,'nw')
+         call avgridmo('lagrangian')
+         call avfield(1,'nw')
          time=time+tstp
          call getSurfaceMolecules(12,PIP2m)
          call getSurfaceMolecules(11,PIP3m)
@@ -124,25 +127,21 @@ c--look for current dump position
          call getSurfaceMolecules(2,MessS)
          call getVolumeMolecules(1,ThetV)
          call getSurfaceMolecules(1,ThetS)
-         !call setViscosity
-         !call setMessengerConc
-         !call setSurfaceForce
+         call setViscosity
          call getVolume(volume)
          call getArea(area)
          r0=(volume*3.0/(4.0*3.141592))**(1./3.)
          a0=4.0*3.141592*r0**2
          aratio=area/a0
-         !call setSurfaceTension(aratio)
+         call setSurfaceTension(aratio)
          height = volume/area
-         print *,"time:",time!,"area:",area,"volume:",volume
-         print *,"PIP2m:",int(PIP2m),"PI3Km:",int(PI3Km),"PIP3m:",
-     1           int(PIP3m),"PIP3a:",int(PIP3a),"PTENm:",int(PTENm)
+         call printFile(isuff, ipf, 0)
          open(unit=12,file='test_out')
-         !do 
-         !  call modriver(icyc,epsl,idebug)
-         !  print *,"inside icycle:",icyc
-         !  if (icyc.lt.10) exit
-         !enddo
+         do 
+           call modriver(icyc,epsl,idebug)
+           print *,"inside icycle:",icyc
+           if (icyc.lt.10) exit
+         enddo
          call iowrfile(0,12)
          close(12)
          if (isve.eq.1) then
@@ -174,24 +173,78 @@ c--look for current dump position
       stop
       end
 
+      subroutine printFile(isuff, ipf, isStop)
+      use iolibsw
+      character ipf*20, opf*20, fnum*3
+      idot=index(ipf,'.')
+      isuff=isuff+1
+      opf=ipf
+      write(fnum,90)isuff
+      opf(idot+1:idot+3)=fnum
+      print *, "file name:", opf
+      print *,"time:",time
+      print *,"Curve min svec(4) l:1,2,3:",minval(svec(4,1,1:ns)),
+     1        minval(svec(4,2,1:ns)),minval(svec(4,3,1:ns))
+      print *,"Curve max svec(4) l:1,2,3:",maxval(svec(4,1,1:ns)),
+     1        maxval(svec(4,2,1:ns)),maxval(svec(4,3,1:ns))
+      print *,"MSGR min svec(2) l:1,2,3:",minval(svec(2,1,1:ns)),
+     1        minval(svec(2,2,1:ns)),minval(svec(2,3,1:ns))
+      print *,"MSGR max svec(2) l:1,2,3:",maxval(svec(2,1,1:ns)),
+     1        maxval(svec(2,2,1:ns)),maxval(svec(2,3,1:ns))
+      print *,"ThetaN min svec(1) l:1,2,3:",minval(svec(1,1,1:ns)),
+     1        minval(svec(1,2,1:ns)),minval(svec(1,3,1:ns))
+      print *,"ThetaN max svec(1) l:1,2,3:",maxval(svec(1,1,1:ns)),
+     1        maxval(svec(1,2,1:ns)),maxval(svec(1,3,1:ns))
+      print *,"viscos min vis() l:1,2,3:",minval(vis(1,1:ns)),
+     1        minval(vis(2,1:ns)),minval(vis(3,1:ns))
+      print *,"viscos max vis() l:1,2,3:",maxval(vis(1,1:ns)),
+     1        maxval(vis(2,1:ns)),maxval(vis(3,1:ns))
+      print *,"phaserub min phi() l:1,2,3:",minval(phi(1,1:ns)),
+     1        minval(phi(2,1:ns)),minval(phi(3,1:ns))
+      print *,"phaserub max phi() l:1,2,3:",maxval(phi(1,1:ns)),
+     1        maxval(phi(2,1:ns)),maxval(phi(3,1:ns))
+      print *,"surf tension min gam() v,d,e:",minval(gamv(1:nq)),
+     1        minval(gamd(1:nq)),minval(game(1:nl))
+      print *,"surf tension max gam() v,d,e:",maxval(gamv(1:nq)),
+     1        maxval(gamd(1:nq)),maxval(game(1:nl))
+      open(unit=21,file=opf,status='unknown')
+      call iowrfile(0,21)
+      close(21)
+      if(isStop.eq.1) then
+        stop
+      endif
+   90 format(i3.3)
+      end subroutine printFile
+
       subroutine setViscosity
       use iolibsw
       !increase viscosity to slow down the rounding
-      viscosity = 1d6
+      viscosity = 4.39d2
       do isn=1,ns
          do lvn=1,3
-            !viscosity is proportional to the ThetaN [network=svec(1)]
-            vis(lvn,isn)=viscosity*svec(1,lvn,isn)
+            vis(lvn,isn)=max(viscosity*svec(4,lvn,isn), 1238d0)
          enddo
       enddo
       return
       end subroutine setViscosity
 
+      subroutine setPhaserub
+      use iolibsw
+      phaserub = 1d8
+      do isn=1,ns
+         do lvn=1,3
+            phi(lvn,isn)=max(phaserub*svec(4,lvn,isn), 97414015d1)
+         enddo
+      enddo
+      return
+      end subroutine setPhaserub
+
 
       subroutine setSurfaceTension(afac)
       use iolibsw 
       !increase surface_tension to increase the rounding
-      surface_tension = 1d-2
+      !decrease surface tension to increase time steps
+      surface_tension = 0.0111d0
       afac3=afac**3
       do iq=1,nq
          gamv(iq)=surface_tension*afac3
@@ -202,7 +255,6 @@ c--look for current dump position
       enddo
       return
       end subroutine setSurfaceTension
-
 
       subroutine setSlipCondition
       USE iolibsw
@@ -221,41 +273,7 @@ c--look for current dump position
       end subroutine setSlipCondition
 
 
-      subroutine setSurfaceForce !clsfr
-      use iolibsw
-      real(8) ThetaEq,Theta0,tau_n
-      Theta0 = 1d-3
-      tau_n = 1d1
-      iThetaN = 1
-      iMess = 2
-      do iq=1,nq
-         sfrv(iq)=0
-         dorsal=0d0
-         do isn=1,4
-            is=isoq(isn,iq)
-            ThetaEq=Theta0*(1d0+svec(iMESS,3,is))
-            dorsal=dorsal+svec(iThetaN,3,is)*ThetaEq/tau_n
-         enddo
-         sfrd(iq)=0.25*dorsal*1d1
-         !sfrd(iq)=0
-      enddo
-      do il=1,nl
-         edge=0d0
-         do isn=1,2
-            is=isol(isn,il)
-            do lv=1,3
-               ThetaEq=Theta0*(1d0+svec(iMESS,lv,is))
-               edge=edge+svec(iThetaN,lv,is)*ThetaEq/tau_n
-            enddo
-         enddo
-         sfre(il)=edge/6d0*1d3
-         !sfre(il)=0
-      enddo
-      return
-      end subroutine setSurfaceForce
-
-
-      subroutine setSurfaceField !vvec1
+      subroutine setSurfaceField
       USE iolibsw
       real(8) ventral,dorsal,edge
       do iq=1,nq
@@ -282,7 +300,7 @@ c--look for current dump position
       end subroutine setSurfaceField
 
       
-      subroutine setMessengerConc 
+      subroutine initMessengerConc 
       USE iolibsw
       do isn=1,ns
          do lvn=1,3
@@ -295,7 +313,7 @@ c--look for current dump position
             endif 
          enddo
       enddo
-      end subroutine setMessengerConc
+      end subroutine initMessengerConc
 
 
       subroutine getArea(area)
@@ -407,7 +425,7 @@ c--look for current dump position
       k10 = 0.0001
       k11 = 1d0 !Messenger source rate
       k12 = 1d0 !Messenger decay rate = 1/tau_m
-      tau_n = 2d1
+      tau_n = 1d0
       Theta0 = 1d-3
 
 

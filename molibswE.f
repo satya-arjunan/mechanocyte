@@ -1810,6 +1810,8 @@
                   nstack=isoq(isn,iq)
                   do lvn=1,3
                      phig=phig+phi(lvn,nstack)*H(lvn,isn,lvg,isg)
+                     !print *,"phig,phi,H:",phig,phi(lvn,nstack),
+!     1                        H(lvn,isn,lvg,isg)
                   enddo
                enddo
                if (phig.le.0d0) then
