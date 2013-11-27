@@ -75,7 +75,7 @@ c--look for current dump position
       idvfx=1 !fixed velocity at boundaries
       idgam=1 !surface tension
       idpsi=0 !network contractility
-      idsfr=0 !surface forces
+      idsfr=1 !surface forces
       idbfr=0 !body forces
       iddrg=0 !drag at boundaries
       idtrc=0 !boundary tractions
@@ -96,6 +96,7 @@ c--look for current dump position
       aratio=area/a0
       call setSurfaceTension(aratio)
       call setSlipCondition
+      call setSurfaceForce
       epsl=1d-4
       call printFile(isuff, ipf, 0)
   10  call modriver(icyc,epsl,idebug)
@@ -125,6 +126,7 @@ c--look for current dump position
          a0=4.0*3.141592*r0**2
          aratio=area/a0
          call setSurfaceTension(aratio)
+         call setSurfaceForce
          height = volume/area
          open(unit=12,file='test_out')
          do 
@@ -165,9 +167,9 @@ c--look for current dump position
       print *, "file name:", opf
       print *,"time:",time
             hvec(1,lvn,isn) = hvec(1,lvn,isn)*1d-5
-      print *,"min x, y, z:",minval(hvec(1,1:3,1:ns)),
+      print *,"min x, y, z hvec:",minval(hvec(1,1:3,1:ns)),
      1        minval(hvec(2,1:3,1:ns)),minval(hvec(3,1:3,1:ns))
-      print *,"max x, y, z:",maxval(hvec(1,1:3,1:ns)),
+      print *,"max x, y, z hvec:",maxval(hvec(1,1:3,1:ns)),
      1        maxval(hvec(2,1:3,1:ns)),maxval(hvec(3,1:3,1:ns))
       print *,"Curve min svec(4) l:1,2,3:",minval(svec(4,1,1:ns)),
      1        minval(svec(4,2,1:ns)),minval(svec(4,3,1:ns))
@@ -193,6 +195,10 @@ c--look for current dump position
      1        minval(gamd(1:nq)),minval(game(1:nl))
       print *,"surf tension max gam() v,d,e:",maxval(gamv(1:nq)),
      1        maxval(gamd(1:nq)),maxval(game(1:nl))
+      print *,"surf force min sfr v,d,e:",minval(sfrv(1:nq)),
+     1        minval(sfrd(1:nq)),minval(sfre(1:nl))
+      print *,"surf force max sfr v,d,e:",maxval(sfrv(1:nq)),
+     1        maxval(sfrd(1:nq)),maxval(sfre(1:nl))
       open(unit=21,file=opf,status='unknown')
       call iowrfile(0,21)
       close(21)
@@ -265,6 +271,36 @@ c--look for current dump position
       enddo
       end subroutine setSlipCondition
 
+      subroutine setSurfaceForce !clsfr
+      use iolibsw
+      real(8) ThetaEq,Theta0,tau_n
+      iThetaN = 12
+      Theta0 = 1d-3
+      tau_n = 1d1
+      iMess = 2
+      do iq=1,nq
+         sfrv(iq)=0
+         dorsal=0d0
+         do isn=1,4
+            is=isoq(isn,iq)
+            !ThetaEq=Theta0*(1d0+svec(iMESS,3,is))
+            dorsal=dorsal+svec(iThetaN,3,is)
+         enddo
+         sfrd(iq)=0.25*dorsal*1d-8
+      enddo
+      do il=1,nl
+         edge=0d0
+         do isn=1,2
+            is=isol(isn,il)
+            do lv=1,3
+               !ThetaEq=Theta0*(1d0+svec(iMESS,lv,is))
+               edge=edge+svec(iThetaN,lv,is)
+            enddo
+         enddo
+         sfre(il)=edge/6d0*9d-7
+      enddo
+      return
+      end subroutine setSurfaceForce
 
       subroutine setSurfaceField
       USE iolibsw
