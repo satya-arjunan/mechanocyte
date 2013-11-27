@@ -247,7 +247,7 @@ c--look for current dump position
       use iolibsw 
       !increase surface_tension to increase the rounding
       !decrease surface tension to increase time steps
-      surface_tension = 5.5d0
+      surface_tension = 5.5d2
       afac3=afac**3
       do iq=1,nq
          gamv(iq)=surface_tension*afac3
@@ -301,7 +301,7 @@ c--look for current dump position
                edge=edge+svec(iThetaN,lv,is)
             enddo
          enddo
-         sfre(il)=edge/6d0*9d-7
+         sfre(il)=edge/6d0*5d-7
       enddo
       return
       end subroutine setSurfaceForce
