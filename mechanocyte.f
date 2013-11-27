@@ -218,10 +218,14 @@ c--look for current dump position
       subroutine setViscosity
       use iolibsw
       !increase viscosity to slow down the rounding
-      viscosity = 4.39d13
+      real(8) minVis
+      viscosity = 4.1d1
+      minVis = viscosity*0.8d+13
+      iThetaN = 12
       do isn=1,ns
          do lvn=1,3
-            vis(lvn,isn)=max(viscosity*svec(4,lvn,isn), 1238d11)
+            !vis(lvn,isn)=max(viscosity*svec(iThetaN,lvn,isn), minVis)
+            vis(lvn,isn)=max(viscosity*svec(iThetaN,lvn,isn), minVis)
          enddo
       enddo
       return
@@ -229,10 +233,10 @@ c--look for current dump position
 
       subroutine setPhaserub
       use iolibsw
-      phaserub = 1d8
+      phaserub = 1d6
       do isn=1,ns
          do lvn=1,3
-            phi(lvn,isn)=max(phaserub*svec(4,lvn,isn), 97414015d1)
+            phi(lvn,isn)=max(phaserub*svec(4,lvn,isn), 97414015d-1)
          enddo
       enddo
       return
@@ -243,7 +247,7 @@ c--look for current dump position
       use iolibsw 
       !increase surface_tension to increase the rounding
       !decrease surface tension to increase time steps
-      surface_tension = 0.0111d-2
+      surface_tension = 5.5d0
       afac3=afac**3
       do iq=1,nq
          gamv(iq)=surface_tension*afac3
@@ -286,7 +290,7 @@ c--look for current dump position
             !ThetaEq=Theta0*(1d0+svec(iMESS,3,is))
             dorsal=dorsal+svec(iThetaN,3,is)
          enddo
-         sfrd(iq)=0.25*dorsal*1d-8
+         sfrd(iq)=0.25*dorsal*3d-8
       enddo
       do il=1,nl
          edge=0d0
