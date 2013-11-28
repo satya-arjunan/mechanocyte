@@ -70,12 +70,12 @@ c--look for current dump position
       endif
       print *,'tnext,tstop',tnext,tstop
 
-      idphi=1 !phase rub
-      idvis=1 !viscosity
+      idphi=0 !phase rub
+      idvis=0 !viscosity
       idvfx=1 !fixed velocity at boundaries
-      idgam=1 !surface tension
+      idgam=0 !surface tension
       idpsi=0 !network contractility
-      idsfr=1 !surface forces
+      idsfr=0 !surface forces
       idbfr=0 !body forces
       iddrg=0 !drag at boundaries
       idtrc=0 !boundary tractions
@@ -84,9 +84,9 @@ c--look for current dump position
       !call normalizeCoords
       !call writeInitMeshFile
       !stop
+      call initContactLine
       call initsvec
       call setSurfaceField
-      call initMessengerConc
       call setPhaserub
       call setViscosity
       !call setNetworkContractility
@@ -101,26 +101,26 @@ c--look for current dump position
       call setSurfaceForce
       epsl=1d-4
       call printFile(isuff, ipf, 0)
-  10  call modriver(icyc,epsl,idebug)
-      if (icyc.gt.10) goto 10
+!  10  call modriver(icyc,epsl,idebug)
+!      if (icyc.gt.10) goto 10
       logInt = 40d0
   100 continue
-         call avtstep(avdt)
-         if (avdt.lt.1d-5) then
-            print *,'small avdt!',avdt
-            stop
-         endif
+         !call avtstep(avdt)
+         !if (avdt.lt.1d-5) then
+         !   print *,'small avdt!',avdt
+         !   stop
+         !endif
          call cmstpsiz(cmdt,1d-2)
          tstp=min(cmdt(2),cmdt(4))
-         tstp=min(avdt,tstp)
+         !tstp=min(avdt,tstp)
          if (tstp.ge.(tnext-time)) then
             tstp=tnext-time
             isve=1
          endif
          call clchm(area, tstp)
          call dfdriver('eulerian')
-         call avgridmo('lagrangian',idebug)
-         call avfield(1,'nw')
+         !call avgridmo('lagrangian',idebug)
+         !call avfield(1,'nw')
          call setPhaserub
          call setViscosity
          !call setNetworkContractility
@@ -131,10 +131,10 @@ c--look for current dump position
          call getArea(area)
          aratio=area/a0
          call setSurfaceTension(aratio)
-         do 
-           call modriver(icyc,epsl,idebug)
-           if (icyc.lt.10) exit
-         enddo
+         !do 
+         !  call modriver(icyc,epsl,idebug)
+         !  if (icyc.lt.10) exit
+         !enddo
          time=time+tstp
          print *,"time:",time,cmdt(2),cmdt(4),avdt
          if (isve.eq.1) then
@@ -163,13 +163,13 @@ c--look for current dump position
      1        minval(hvec(2,1:3,1:ns)),minval(hvec(3,1:3,1:ns))
       print *,"max x, y, z hvec:",maxval(hvec(1,1:3,1:ns)),
      1        maxval(hvec(2,1:3,1:ns)),maxval(hvec(3,1:3,1:ns))
-      print *,"Curve min svec(4) l:1,2,3:",minval(svec(4,1,1:ns)),
+      print *,"Mess min svec(4) l:1,2,3:",minval(svec(4,1,1:ns)),
      1        minval(svec(4,2,1:ns)),minval(svec(4,3,1:ns))
-      print *,"Curve max svec(4) l:1,2,3:",maxval(svec(4,1,1:ns)),
+      print *,"Mess max svec(4) l:1,2,3:",maxval(svec(4,1,1:ns)),
      1        maxval(svec(4,2,1:ns)),maxval(svec(4,3,1:ns))
-      print *,"MSGR min svec(2) l:1,2,3:",minval(svec(2,1,1:ns)),
+      print *,"Var min svec(2) l:1,2,3:",minval(svec(2,1,1:ns)),
      1        minval(svec(2,2,1:ns)),minval(svec(2,3,1:ns))
-      print *,"MSGR max svec(2) l:1,2,3:",maxval(svec(2,1,1:ns)),
+      print *,"Var max svec(2) l:1,2,3:",maxval(svec(2,1,1:ns)),
      1        maxval(svec(2,2,1:ns)),maxval(svec(2,3,1:ns))
       print *,"ThetaN min svec(1) l:1,2,3:",minval(svec(1,1,1:ns)),
      1        minval(svec(1,2,1:ns)),minval(svec(1,3,1:ns))
@@ -241,7 +241,7 @@ c--look for current dump position
       !increase surface_tension to increase the rounding
       !decrease surface tension to increase time steps
       real(8) surface_tension
-      surface_tension = 1d-2
+      surface_tension = 1d-4
       afac3=afac**3
       do iq=1,nq
          gamv(iq)=surface_tension*afac3
@@ -337,22 +337,6 @@ c--look for current dump position
       end subroutine setSurfaceField
 
       
-      subroutine initMessengerConc 
-      USE iolibsw
-      do isn=1,ns
-         do lvn=1,3
-            svec(2,lvn,isn) = 0 !messenger
-            svec(4,lvn,isn) = 0 !curvature
-            if(arean(lvn,isn).gt.0) then
-               !set the messenger to be ~20 at the highly curved region:
-               svec(4,lvn,isn) = snn(0,lvn,isn)/arean(lvn,isn)*6.6173d-5
-               svec(2,lvn,isn) = svec(4,lvn,isn)
-            endif 
-         enddo
-      enddo
-      end subroutine initMessengerConc
-
-
       subroutine getArea(area)
       USE iolibsw
       real(8) area,surfintv,surfintd,surfinte
@@ -413,7 +397,6 @@ c--look for current dump position
 
       subroutine initsvec
       USE iolibsw
-      integer in
       real(8) x,y
       do isn=1,ns
          do lvn=1,3
@@ -431,6 +414,16 @@ c--look for current dump position
       enddo
       end subroutine initsvec
 
+      subroutine initContactLine
+      USE iolibsw
+      do is=1,ns
+         svec(4,1,is)=1d-4
+      enddo
+      do il=1,nl
+         cxprm(4,il)=1d0
+         cxval(4,il)=2d-1
+      enddo
+      end subroutine initContactLine
 
       subroutine clchm(area, step)
       use iolibsw
@@ -507,7 +500,9 @@ c     1        "PIP2:",int(PIP2*area)
             sdot(iThetaN,lvn,isn) = (ThetaEq-ThetaN)*MESS/tau_n
             sdkr(iThetaN,lvn,isn) = -MESS/tau_n
 
-
+            !Decay messenger overall
+            sdot(4,lvn,isn)=(1d-4-svec(4,lvn,isn))/5d1
+            sdkr(4,lvn,isn)=-1d0/5d1
 
             sdot(iPIP2,lvn,isn) = k1*PIP2-k5*PIP2m*PI3Km+k6*PIP3m*PTENm+
      1                            k7*PIP3a*PTENm-k10*PIP2m
