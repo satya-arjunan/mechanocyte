@@ -439,8 +439,7 @@ c--look for current dump position
       iPIP3a = 10
       iPTEN = 9
       iPI3K = 8
-      iCURV = 4
-      iMESS = 2
+      iMESS = 4
       iThetaN = 1
 
       k1 = 4d-2
@@ -462,7 +461,7 @@ c--look for current dump position
       maxConc = 8.7816d13
       PIPtc = 1.089171d13
       PTENtc = 7.62666d12
-      PI3Ktc = 1.44957d13
+      PI3Ktc = 0.9d13
 
       call getSurfaceMolecules(iPIP2,val)
       PIP2 = val
@@ -488,19 +487,17 @@ c     1        "PIP2:",int(PIP2*area)
             PTENm = svec(iPTEN,lvn,isn)
             PI3Km = svec(iPI3K,lvn,isn)
             MESS = svec(iMESS,lvn,isn)
-            CURV = svec(iCURV,lvn,isn)
             ThetaN = svec(iThetaN,lvn,isn)
 
-            !Source and decay messenger
-            sdot(iMESS,lvn,isn) = k11*CURV-k12*MESS
-            sdkr(iMESS,lvn,isn) = -k12
-
             !Create network
-            ThetaEq=Theta0*(1d0+MESS)
-            sdot(iThetaN,lvn,isn) = (ThetaEq-ThetaN)*MESS/tau_n
-            sdkr(iThetaN,lvn,isn) = -MESS/tau_n
+            !ThetaEq=Theta0*(1d0+MESS)
+            !sdot(iThetaN,lvn,isn) = (ThetaEq-ThetaN)*MESS/tau_n
+            !sdkr(iThetaN,lvn,isn) = -MESS/tau_n
 
-            !Decay messenger overall
+            sdot(1,lvn,isn)=1d-5*PIP2m*svec(4,lvn,isn)-0.05*ThetaN
+            sdkr(1,lvn,isn)=-0.05
+
+            !Decay messenger
             sdot(4,lvn,isn)=(1d-4-svec(4,lvn,isn))/5d1
             sdkr(4,lvn,isn)=-1d0/5d1
 

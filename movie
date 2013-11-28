@@ -9,5 +9,5 @@ for i in $FILE.[0-9][0-9][0-9]; do
     rm -f $i.rgb
   fi
 done 
-avconv -y -r 5 -i $FILE.%03d.jpg -vcodec qtrle -r 5 $FILE.mov
+avconv -y -r 25 -i $FILE.%03d.jpg -vcodec qtrle -r 25 $FILE.mov
 vlc $FILE.mov
