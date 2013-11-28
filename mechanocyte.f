@@ -86,7 +86,6 @@ c--look for current dump position
       !stop
       call initContactLine
       call initsvec
-      !call setSurfaceField
       call setPhaserub
       call setViscosity
       !call setNetworkContractility
@@ -215,10 +214,10 @@ c--look for current dump position
       use iolibsw
       !increase viscosity to slow down the rounding
       real(8) viscosity
-      viscosity = 1d8
+      viscosity = 1d6
       do isn=1,ns
          do lvn=1,3
-            vis(lvn,isn)=viscosity
+            vis(lvn,isn)=viscosity*svec(1,lvn,isn)
          enddo
       enddo
       return
@@ -227,10 +226,10 @@ c--look for current dump position
       subroutine setPhaserub
       use iolibsw
       real(8) phaserub
-      phaserub = 1d19
+      phaserub = 1d17
       do isn=1,ns
          do lvn=1,3
-            phi(lvn,isn)=phaserub
+            phi(lvn,isn)=phaserub*svec(1,lvn,isn)
          enddo
       enddo
       return
@@ -456,6 +455,7 @@ c--look for current dump position
       k12 = 1d0 !Messenger decay rate = 1/tau_m
       tau_n = 1d0
       Theta0 = 1d-3
+      tautheta=2d0
 
 
       maxConc = 8.7816d13
@@ -493,9 +493,12 @@ c     1        "PIP2:",int(PIP2*area)
             !ThetaEq=Theta0*(1d0+MESS)
             !sdot(iThetaN,lvn,isn) = (ThetaEq-ThetaN)*MESS/tau_n
             !sdkr(iThetaN,lvn,isn) = -MESS/tau_n
+            thetaeq=Theta0*(PIP2m*MESS+1d0)
+            sdot(1,lvn,isn)=(thetaeq-ThetaN)/(tautheta/(PIP2m*MESS))
+            sdkr(1,lvn,isn)=-1d0/(tautheta/(PIP2m*MESS))
 
-            sdot(1,lvn,isn)=1d-5*PIP2m*svec(4,lvn,isn)-0.05*ThetaN
-            sdkr(1,lvn,isn)=-0.05
+            !sdot(1,lvn,isn)=1d-5*PIP2m*svec(4,lvn,isn)-0.05*ThetaN
+            !sdkr(1,lvn,isn)=-0.05
 
             !Decay messenger
             sdot(4,lvn,isn)=(1d-4-svec(4,lvn,isn))/5d1
