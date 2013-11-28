@@ -215,7 +215,7 @@ c--look for current dump position
       use iolibsw
       !increase viscosity to slow down the rounding
       real(8) viscosity
-      viscosity = 1d10
+      viscosity = 1d8
       do isn=1,ns
          do lvn=1,3
             vis(lvn,isn)=viscosity
@@ -227,7 +227,7 @@ c--look for current dump position
       subroutine setPhaserub
       use iolibsw
       real(8) phaserub
-      phaserub = 1d21
+      phaserub = 1d19
       do isn=1,ns
          do lvn=1,3
             phi(lvn,isn)=phaserub
