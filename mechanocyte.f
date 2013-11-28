@@ -117,7 +117,7 @@ c--look for current dump position
             tstp=tnext-time
             isve=1
          endif
-         call dfdriver('lagrangian')
+         call dfdriver('eulerian')
          call avgridmo('lagrangian',idebug)
          call avfield(1,'nw')
          call setPhaserub
@@ -125,9 +125,9 @@ c--look for current dump position
          !call setNetworkContractility
          call setSurfaceForce
          call getVolume(volume)
-         call getArea(area)
          r0=(volume*3.0/(4.0*3.141592))**(1./3.)
          a0=4.0*3.141592*r0**2
+         call getArea(area)
          aratio=area/a0
          call setSurfaceTension(aratio)
          do 
@@ -135,7 +135,7 @@ c--look for current dump position
            if (icyc.lt.10) exit
          enddo
          time=time+tstp
-         print *,"time:",time,tstp,cmdt(2),cmdt(4),avdt
+         print *,"time:",time,cmdt(2),cmdt(4),avdt
          if (isve.eq.1) then
            call printFile(isuff,ipf,0)
            tnext=tnext+logInt
