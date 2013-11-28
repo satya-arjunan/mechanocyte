@@ -74,22 +74,22 @@ c--look for current dump position
       idvis=1 !viscosity
       idvfx=1 !fixed velocity at boundaries
       idgam=1 !surface tension
-      idpsi=1 !network contractility
+      idpsi=0 !network contractility
       idsfr=1 !surface forces
       idbfr=0 !body forces
       iddrg=0 !drag at boundaries
       idtrc=0 !boundary tractions
       idhyc=0 !boundary solvent permeability
+      idebug=0
       !call normalizeCoords
       !call writeInitMeshFile
       !stop
       call initsvec
       call setSurfaceField
       call initMessengerConc
-      idebug=0
       call setPhaserub
       call setViscosity
-      call setNetworkContractility
+      !call setNetworkContractility
       call getVolume(volume)
       call getArea(area)
       r0=(volume*3.0/(4.0*3.141592))**(1./3.)
@@ -101,58 +101,39 @@ c--look for current dump position
       epsl=1d-4
       call printFile(isuff, ipf, 0)
   10  call modriver(icyc,epsl,idebug)
-      print *,"init icycle:",icyc
       if (icyc.gt.10) goto 10
   100 continue
+         call avtstep(avdt)
+         if (avdt.lt.1d-5) then
+            print *,'small avdt!',avdt
+            stop
+         endif
          call clchm(area)
          call cmstpsiz(cmdt,1d-2)
-         tstp=min(cmdt(2),cmdt(4))
-!        tstp=cmdt(2)
-         if (tstp.ge.(tnext-time)) then
-            tstp=tnext-time
-            isve=1
-         else
-            isve=0
-         endif
+         tstp=min(cmdt(2), 30d0)
+         tstp=min(cmdt(4),tstp)
+         tstp=min(avdt,tstp)
+         time=time+tstp
+         print *,"time:",time,cmdt(2),cmdt(4),avdt
          call dfdriver('eulerian')
-         !call avgridmo('lagrangian',0,idebug)
          call avgridmo('lagrangian',idebug)
          call avfield(1,'nw')
-         time=time+tstp
-         print *,"time:",time
          call setPhaserub
          call setViscosity
-         call setNetworkContractility
+         !call setNetworkContractility
+         call setSurfaceForce
          call getVolume(volume)
          call getArea(area)
          r0=(volume*3.0/(4.0*3.141592))**(1./3.)
          a0=4.0*3.141592*r0**2
          aratio=area/a0
          call setSurfaceTension(aratio)
-         call setSurfaceForce
-         height = volume/area
-         open(unit=12,file='test_out')
          do 
            call modriver(icyc,epsl,idebug)
            if (icyc.lt.10) exit
          enddo
-         call iowrfile(0,12)
-         close(12)
-         if (isve.eq.1) then
-           call printFile(isuff,ipf,0)
-           if (time.ge.tstop*0.999) then
-              print *,'time,tstop',time,tstop
-              close(31)
-              stop
-           else
-              idump=idump+1
-              if (logInt.eq.0) then
-                 tnext=tdump(idump)
-              else
-                 tnext=tnext+logInt
-              endif
-           endif
-         endif
+         isuff=isuff+1
+         call printFile(isuff, ipf, 0)
          goto 100
    90 format(i3.3)
       stop
@@ -225,13 +206,11 @@ c--look for current dump position
       subroutine setViscosity
       use iolibsw
       !increase viscosity to slow down the rounding
-      real(8) viscosity, minVis
-      viscosity = 4.1d1
-      minVis = viscosity*0.8d+13
-      iThetaN = 12
+      real(8) viscosity
+      viscosity = 1d10
       do isn=1,ns
          do lvn=1,3
-            vis(lvn,isn)=max(viscosity*svec(iThetaN,lvn,isn), minVis)
+            vis(lvn,isn)=viscosity
          enddo
       enddo
       return
@@ -239,17 +218,59 @@ c--look for current dump position
 
       subroutine setPhaserub
       use iolibsw
-      real(8) phaserub, minPhi
-      phaserub = 1d-5
-      minPhi = phaserub*9d+14
-      iThetaN = 12
+      real(8) phaserub
+      phaserub = 1d21
       do isn=1,ns
          do lvn=1,3
-            phi(lvn,isn)=max(phaserub*svec(iThetaN,lvn,isn), minPhi)
+            phi(lvn,isn)=phaserub
          enddo
       enddo
       return
       end subroutine setPhaserub
+
+      subroutine setSurfaceTension(afac)
+      use iolibsw 
+      !increase surface_tension to increase the rounding
+      !decrease surface tension to increase time steps
+      real(8) surface_tension
+      surface_tension = 1d-2
+      afac3=afac**3
+      do iq=1,nq
+         gamv(iq)=surface_tension*afac3
+         gamd(iq)=surface_tension*afac3
+      enddo
+      do il=1,nl
+         game(il)=surface_tension*afac3
+      enddo
+      return
+      end subroutine setSurfaceTension
+
+      subroutine setSurfaceForce !clsfr
+      use iolibsw
+      real(8) ThetaEq,Theta0,tau_n
+      iThetaN = 12
+      do iq=1,nq
+         sfrv(iq)=0
+         dorsal=0d0
+         do isn=1,4
+            is=isoq(isn,iq)
+            dorsal=dorsal+svec(iThetaN,3,is)
+         enddo
+         sfrd(iq)=0.25*dorsal*1d-15
+      enddo
+      do il=1,nl
+         edge=0d0
+         do isn=1,2
+            is=isol(isn,il)
+            do lv=1,3
+               edge=edge+svec(iThetaN,lv,is)
+            enddo
+         enddo
+         sfre(il)=edge/6d0*1d-15
+      enddo
+      return
+      end subroutine setSurfaceForce
+
 
       subroutine setNetworkContractility
       use iolibsw
@@ -264,23 +285,6 @@ c--look for current dump position
       enddo
       return
       end subroutine setNetworkContractility
-
-
-      subroutine setSurfaceTension(afac)
-      use iolibsw 
-      !increase surface_tension to increase the rounding
-      !decrease surface tension to increase time steps
-      surface_tension = 5.5d2
-      afac3=afac**3
-      do iq=1,nq
-         gamv(iq)=surface_tension*afac3
-         gamd(iq)=surface_tension*afac3
-      enddo
-      do il=1,nl
-         game(il)=surface_tension*afac3
-      enddo
-      return
-      end subroutine setSurfaceTension
 
       subroutine setSlipCondition
       USE iolibsw
@@ -297,37 +301,6 @@ c--look for current dump position
          vfixv(2,iq)=0d0 !free (slip) ventral edge elements in y direction
       enddo
       end subroutine setSlipCondition
-
-      subroutine setSurfaceForce !clsfr
-      use iolibsw
-      real(8) ThetaEq,Theta0,tau_n
-      iThetaN = 12
-      Theta0 = 1d-3
-      tau_n = 1d1
-      iMess = 2
-      do iq=1,nq
-         sfrv(iq)=0
-         dorsal=0d0
-         do isn=1,4
-            is=isoq(isn,iq)
-            !ThetaEq=Theta0*(1d0+svec(iMESS,3,is))
-            dorsal=dorsal+svec(iThetaN,3,is)
-         enddo
-         sfrd(iq)=0.25*dorsal*3d-8
-      enddo
-      do il=1,nl
-         edge=0d0
-         do isn=1,2
-            is=isol(isn,il)
-            do lv=1,3
-               !ThetaEq=Theta0*(1d0+svec(iMESS,lv,is))
-               edge=edge+svec(iThetaN,lv,is)
-            enddo
-         enddo
-         sfre(il)=edge/6d0*5d-7
-      enddo
-      return
-      end subroutine setSurfaceForce
 
       subroutine setSurfaceField
       USE iolibsw
