@@ -264,7 +264,7 @@ c--look for current dump position
             is=isoq(isn,iq)
             dorsal=dorsal+svec(iThetaN,3,is)
          enddo
-         sfrd(iq)=0.25*dorsal*1d-15
+         sfrd(iq)=0.25*dorsal*1d-14
       enddo
       do il=1,nl
          edge=0d0
@@ -274,7 +274,7 @@ c--look for current dump position
                edge=edge+svec(iThetaN,lv,is)
             enddo
          enddo
-         sfre(il)=edge/6d0*1d-15
+         sfre(il)=edge/6d0*1d-13
       enddo
       return
       end subroutine setSurfaceForce
