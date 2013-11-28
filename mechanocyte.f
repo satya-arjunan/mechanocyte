@@ -86,7 +86,7 @@ c--look for current dump position
       !stop
       call initContactLine
       call initsvec
-      call setSurfaceField
+      !call setSurfaceField
       call setPhaserub
       call setViscosity
       !call setNetworkContractility
@@ -256,7 +256,7 @@ c--look for current dump position
       subroutine setSurfaceForce !clsfr
       use iolibsw
       real(8) ThetaEq,Theta0,tau_n
-      iThetaN = 12
+      iThetaN = 1
       do iq=1,nq
          sfrv(iq)=0
          dorsal=0d0
@@ -285,7 +285,7 @@ c--look for current dump position
       real(8) netcontract, minNet
       netcontract = 1d-10
       minNet = netcontract*9d14
-      iThetaN = 12
+      iThetaN = 1
       do isn=1,ns
          do lvn=1,3
             psi(lvn,isn)=max(netcontract*svec(iThetaN,lvn,isn), minNet)
@@ -450,7 +450,7 @@ c--look for current dump position
       k6 = 5d-14
       k7 = 5d-14
       k8 = 0.09
-      k9 = 0.02
+      k9 = 0.02 !PIP3m decay rate
       k10 = 0.0001
       k11 = 1d0 !Messenger source rate
       k12 = 1d0 !Messenger decay rate = 1/tau_m
