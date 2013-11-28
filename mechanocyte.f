@@ -427,8 +427,9 @@ c--look for current dump position
       subroutine clchm(area, step)
       use iolibsw
       integer in,iPIP2,iPIP3,iPIP3a,iPI3K,iPTEN,iMESS,iCURV,iThetaN
+      integer iVar
       real(8) step, PIPtc,PTENtc,PI3Ktc
-      real(8) PIP2m,PIP3m,PIP3a,PI3Km,PTENm,MESS,CURV,ThetaN
+      real(8) PIP2m,PIP3m,PIP3a,PI3Km,PTENm,MESS,CURV,ThetaN,Var
       real(8) PIP2,PI3K,PTEN,maxConc,new,area,val
       real(8) k1,k2,k3,k4,k5,k6,k7,k8,k9,k10,k11,k12
       real(8) ThetaEq,Theta0,tau_n
@@ -440,6 +441,7 @@ c--look for current dump position
       iPI3K = 8
       iMESS = 4
       iThetaN = 1
+      iVar = 2
 
       k1 = 4d-2
       k2 = 2d-14
@@ -488,17 +490,18 @@ c     1        "PIP2:",int(PIP2*area)
             PI3Km = svec(iPI3K,lvn,isn)
             MESS = svec(iMESS,lvn,isn)
             ThetaN = svec(iThetaN,lvn,isn)
+            Var = svec(iVar,lvn,isn)
 
             !Create network
             !ThetaEq=Theta0*(1d0+MESS)
             !sdot(iThetaN,lvn,isn) = (ThetaEq-ThetaN)*MESS/tau_n
             !sdkr(iThetaN,lvn,isn) = -MESS/tau_n
-            thetaeq=Theta0*(PIP2m*MESS+1d0)
-            sdot(1,lvn,isn)=(thetaeq-ThetaN)/(tautheta/(PIP2m*MESS))
-            sdkr(1,lvn,isn)=-1d0/(tautheta/(PIP2m*MESS))
+            thetaeq=Theta0*(Var+1d0)
+            sdot(1,lvn,isn)=(thetaeq-ThetaN)/(tautheta/Var)
+            sdkr(1,lvn,isn)=-1d0/(tautheta/Var)
 
-            !sdot(1,lvn,isn)=1d-5*PIP2m*svec(4,lvn,isn)-0.05*ThetaN
-            !sdkr(1,lvn,isn)=-0.05
+            sdot(2,lvn,isn)=PIP2m*Mess-0.05*Var
+            sdkr(2,lvn,isn)=-0.05
 
             !Decay messenger
             sdot(4,lvn,isn)=(1d-4-svec(4,lvn,isn))/5d1
