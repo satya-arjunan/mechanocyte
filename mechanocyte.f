@@ -70,12 +70,12 @@ c--look for current dump position
       endif
       print *,'tnext,tstop',tnext,tstop
 
-      idphi=1 !phase rub
-      idvis=1 !viscosity
+      idphi=0 !phase rub
+      idvis=0 !viscosity
       idvfx=1 !fixed velocity at boundaries
-      idgam=1 !surface tension
+      idgam=0 !surface tension
       idpsi=0 !network contractility
-      idsfr=1 !surface forces
+      idsfr=0 !surface forces
       idbfr=0 !body forces
       iddrg=0 !drag at boundaries
       idtrc=0 !boundary tractions
@@ -92,6 +92,7 @@ c--look for current dump position
       !call setNetworkContractility
       call getVolume(volume)
       call getArea(area)
+      print *,"area:",area
       r0=(volume*3.0/(4.0*3.141592))**(1./3.)
       a0=4.0*3.141592*r0**2
       aratio=area/a0
@@ -100,26 +101,26 @@ c--look for current dump position
       call setSurfaceForce
       epsl=1d-4
       call printFile(isuff, ipf, 0)
-  10  call modriver(icyc,epsl,idebug)
-      if (icyc.gt.10) goto 10
+!  10  call modriver(icyc,epsl,idebug)
+      !if (icyc.gt.10) goto 10
       logInt = 40d0
   100 continue
-         call avtstep(avdt)
-         if (avdt.lt.1d-5) then
-            print *,'small avdt!',avdt
-            stop
-         endif
-         call clchm(area)
+         !call avtstep(avdt)
+         !if (avdt.lt.1d-5) then
+         !   print *,'small avdt!',avdt
+         !   stop
+         !endif
          call cmstpsiz(cmdt,1d-2)
          tstp=min(cmdt(2),cmdt(4))
-         tstp=min(avdt,tstp)
+         !tstp=min(avdt,tstp)
          if (tstp.ge.(tnext-time)) then
             tstp=tnext-time
             isve=1
          endif
+         call clchm(area, tstp)
          call dfdriver('eulerian')
-         call avgridmo('lagrangian',idebug)
-         call avfield(1,'nw')
+         !call avgridmo('lagrangian',idebug)
+         !call avfield(1,'nw')
          call setPhaserub
          call setViscosity
          !call setNetworkContractility
@@ -130,10 +131,10 @@ c--look for current dump position
          call getArea(area)
          aratio=area/a0
          call setSurfaceTension(aratio)
-         do 
-           call modriver(icyc,epsl,idebug)
-           if (icyc.lt.10) exit
-         enddo
+         !do 
+         !  call modriver(icyc,epsl,idebug)
+         !  if (icyc.lt.10) exit
+         !enddo
          time=time+tstp
          print *,"time:",time,cmdt(2),cmdt(4),avdt
          if (isve.eq.1) then
@@ -402,9 +403,9 @@ c--look for current dump position
       real(8) x,y
       do isn=1,ns
          do lvn=1,3
-            hvec(1,lvn,isn) = hvec(1,lvn,isn)*0.8
-            hvec(2,lvn,isn) = hvec(2,lvn,isn)*0.8
-            hvec(3,lvn,isn) = hvec(3,lvn,isn)*0.5
+            hvec(1,lvn,isn) = hvec(1,lvn,isn)*1.05
+            hvec(2,lvn,isn) = hvec(2,lvn,isn)*1.05
+            hvec(3,lvn,isn) = hvec(3,lvn,isn)*1.05
          enddo
       enddo
       end subroutine normalizeCoords
@@ -431,10 +432,10 @@ c--look for current dump position
       end subroutine initsvec
 
 
-      subroutine clchm(area)
+      subroutine clchm(area, step)
       use iolibsw
       integer in,iPIP2,iPIP3,iPIP3a,iPI3K,iPTEN,iMESS,iCURV,iThetaN
-      real(8) PIPtc,PTENtc,PI3Ktc
+      real(8) step, PIPtc,PTENtc,PI3Ktc
       real(8) PIP2m,PIP3m,PIP3a,PI3Km,PTENm,MESS,CURV,ThetaN
       real(8) PIP2,PI3K,PTEN,maxConc,new,area,val
       real(8) k1,k2,k3,k4,k5,k6,k7,k8,k9,k10,k11,k12
@@ -511,7 +512,7 @@ c     1        "PIP2:",int(PIP2*area)
             sdot(iPIP2,lvn,isn) = k1*PIP2-k5*PIP2m*PI3Km+k6*PIP3m*PTENm+
      1                            k7*PIP3a*PTENm-k10*PIP2m
             sdkr(iPIP2,lvn,isn) = -k5*PI3Km-k10
-            new = PIP2m + sdot(iPIP2,lvn,isn)*tstp
+            new = PIP2m + sdot(iPIP2,lvn,isn)*step
             if (new.gt.maxConc) then
               sdot(iPIP2,lvn,isn) = 0
               sdkr(iPIP2,lvn,isn) = 0
@@ -519,7 +520,7 @@ c     1        "PIP2:",int(PIP2*area)
 
             sdot(iPTEN,lvn,isn) = k2*PTEN*PIP2m-k8*PTENm
             sdkr(iPTEN,lvn,isn) = -k8
-            new = PTENm + sdot(iPTEN,lvn,isn)*tstp
+            new = PTENm + sdot(iPTEN,lvn,isn)*step
             if (new.gt.maxConc) then
               sdot(iPTEN,lvn,isn) = 0
               sdkr(iPTEN,lvn,isn) = 0
@@ -528,7 +529,7 @@ c     1        "PIP2:",int(PIP2*area)
             sdot(iPIP3a,lvn,isn) = -k3*PIP3a*PI3K+k4*PIP3m*PIP3m-
      1                             k7*PIP3a*PTENm-k9*PIP3a
             sdkr(iPIP3a,lvn,isn) = -k3*PI3k-k7*PTENm-k9
-            new = PIP3a + sdot(iPIP3a,lvn,isn)*tstp
+            new = PIP3a + sdot(iPIP3a,lvn,isn)*step
             if (new.gt.maxConc) then
               sdot(iPIP3a,lvn,isn) = 0
               sdkr(iPIP3a,lvn,isn) = 0
@@ -538,7 +539,7 @@ c     1        "PIP2:",int(PIP2*area)
      1                             k5*PIP2m*PI3Km-k6*PIP3m*PTENm-
      2                             k9*PIP3m
             sdkr(iPIP3,lvn,isn) = -2*k4*PIP3m-k6*PTENm-k9
-            new = PIP3m + sdot(iPIP3,lvn,isn)*tstp
+            new = PIP3m + sdot(iPIP3,lvn,isn)*step
             if (new.gt.maxConc) then
               sdot(iPIP3,lvn,isn) = 0
               sdkr(iPIP3,lvn,isn) = 0
@@ -546,7 +547,7 @@ c     1        "PIP2:",int(PIP2*area)
 
             sdot(iPI3K,lvn,isn) = k3*PIP3a*PI3K-k9*PI3Km
             sdkr(iPI3K,lvn,isn) = -k9
-            new = PI3Km + sdot(iPI3K,lvn,isn)*tstp
+            new = PI3Km + sdot(iPI3K,lvn,isn)*step
             if (new.gt.maxConc) then
               sdot(iPI3K,lvn,isn) = 0
               sdkr(iPI3K,lvn,isn) = 0
