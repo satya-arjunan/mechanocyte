@@ -70,12 +70,12 @@ c--look for current dump position
       endif
       print *,'tnext,tstop',tnext,tstop
 
-      idphi=0 !phase rub
-      idvis=0 !viscosity
+      idphi=1 !phase rub
+      idvis=1 !viscosity
       idvfx=1 !fixed velocity at boundaries
-      idgam=0 !surface tension
+      idgam=1 !surface tension
       idpsi=0 !network contractility
-      idsfr=0 !surface forces
+      idsfr=1 !surface forces
       idbfr=0 !body forces
       iddrg=0 !drag at boundaries
       idtrc=0 !boundary tractions
@@ -101,26 +101,26 @@ c--look for current dump position
       call setSurfaceForce
       epsl=1d-4
       call printFile(isuff, ipf, 0)
-!  10  call modriver(icyc,epsl,idebug)
-      !if (icyc.gt.10) goto 10
+  10  call modriver(icyc,epsl,idebug)
+      if (icyc.gt.10) goto 10
       logInt = 40d0
   100 continue
-         !call avtstep(avdt)
-         !if (avdt.lt.1d-5) then
-         !   print *,'small avdt!',avdt
-         !   stop
-         !endif
+         call avtstep(avdt)
+         if (avdt.lt.1d-5) then
+            print *,'small avdt!',avdt
+            stop
+         endif
          call cmstpsiz(cmdt,1d-2)
          tstp=min(cmdt(2),cmdt(4))
-         !tstp=min(avdt,tstp)
+         tstp=min(avdt,tstp)
          if (tstp.ge.(tnext-time)) then
             tstp=tnext-time
             isve=1
          endif
          call clchm(area, tstp)
          call dfdriver('eulerian')
-         !call avgridmo('lagrangian',idebug)
-         !call avfield(1,'nw')
+         call avgridmo('lagrangian',idebug)
+         call avfield(1,'nw')
          call setPhaserub
          call setViscosity
          !call setNetworkContractility
@@ -131,10 +131,10 @@ c--look for current dump position
          call getArea(area)
          aratio=area/a0
          call setSurfaceTension(aratio)
-         !do 
-         !  call modriver(icyc,epsl,idebug)
-         !  if (icyc.lt.10) exit
-         !enddo
+         do 
+           call modriver(icyc,epsl,idebug)
+           if (icyc.lt.10) exit
+         enddo
          time=time+tstp
          print *,"time:",time,cmdt(2),cmdt(4),avdt
          if (isve.eq.1) then
