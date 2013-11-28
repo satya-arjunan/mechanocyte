@@ -255,7 +255,7 @@ c--look for current dump position
       !increase surface_tension to increase the rounding
       !decrease surface tension to increase time steps
       real(8) surface_tension
-      surface_tension = 1d-4
+      surface_tension = 1d-3
       afac3=afac**3
       do iq=1,nq
          gamv(iq)=surface_tension*afac3
