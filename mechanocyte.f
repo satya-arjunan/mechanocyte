@@ -70,12 +70,12 @@ c--look for current dump position
       endif
       print *,'tnext,tstop',tnext,tstop
 
-      idphi=0 !phase rub
-      idvis=0 !viscosity
+      idphi=1 !phase rub
+      idvis=1 !viscosity
       idvfx=1 !fixed velocity at boundaries
-      idgam=0 !surface tension
+      idgam=1 !surface tension
       idpsi=0 !network contractility
-      idsfr=0 !surface forces
+      idsfr=1 !surface forces
       idbfr=0 !body forces
       iddrg=0 !drag at boundaries
       idtrc=0 !boundary tractions
@@ -86,6 +86,7 @@ c--look for current dump position
       !stop
       call initContactLine
       call initsvec
+      !call setSurfaceField
       call setPhaserub
       call setViscosity
       !call setNetworkContractility
@@ -100,26 +101,26 @@ c--look for current dump position
       call setSurfaceForce
       epsl=1d-4
       call printFile(isuff, ipf, 0)
-!  10  call modriver(icyc,epsl,idebug)
-!      if (icyc.gt.10) goto 10
+  10  call modriver(icyc,epsl,idebug)
+      if (icyc.gt.10) goto 10
       logInt = 40d0
   100 continue
-         !call avtstep(avdt)
-         !if (avdt.lt.1d-5) then
-         !   print *,'small avdt!',avdt
-         !   stop
-         !endif
+         call avtstep(avdt)
+         if (avdt.lt.1d-5) then
+            print *,'small avdt!',avdt
+            stop
+         endif
          call cmstpsiz(cmdt,1d-2)
          tstp=min(cmdt(2),cmdt(4))
-         !tstp=min(avdt,tstp)
+         tstp=min(avdt,tstp)
          if (tstp.ge.(tnext-time)) then
             tstp=tnext-time
             isve=1
          endif
          call clchm(area, tstp)
          call dfdriver('eulerian')
-         !call avgridmo('lagrangian',idebug)
-         !call avfield(1,'nw')
+         call avgridmo('lagrangian',idebug)
+         call avfield(1,'nw')
          call setPhaserub
          call setViscosity
          !call setNetworkContractility
@@ -130,10 +131,10 @@ c--look for current dump position
          call getArea(area)
          aratio=area/a0
          call setSurfaceTension(aratio)
-         !do 
-         !  call modriver(icyc,epsl,idebug)
-         !  if (icyc.lt.10) exit
-         !enddo
+         do 
+           call modriver(icyc,epsl,idebug)
+           if (icyc.lt.10) exit
+         enddo
          time=time+tstp
          print *,"time:",time,cmdt(2),cmdt(4),avdt
          if (isve.eq.1) then
@@ -214,10 +215,17 @@ c--look for current dump position
       use iolibsw
       !increase viscosity to slow down the rounding
       real(8) viscosity
+      real(8) maxnet,minnet,diff
+      maxnet = max(maxval(svec(1,2,1:ns)), maxval(svec(1,3,1:ns)))
+      maxnet = max(maxnet, maxval(svec(1,1,1:ns)))
+      minnet = min(minval(svec(1,2,1:ns)), minval(svec(1,3,1:ns)))
+      minnet = min(maxnet, minval(svec(1,1,1:ns)))
+      diff = max(maxnet, 2d1)-max(minnet, 1d0)
+      print *,"diff vis:",diff
       viscosity = 1d6
       do isn=1,ns
          do lvn=1,3
-            vis(lvn,isn)=viscosity*svec(1,lvn,isn)
+            vis(lvn,isn)=viscosity*2d1*max(svec(1,lvn,isn), 1d0)/diff
          enddo
       enddo
       return
@@ -226,10 +234,17 @@ c--look for current dump position
       subroutine setPhaserub
       use iolibsw
       real(8) phaserub
-      phaserub = 1d17
+      real(8) maxnet,minnet,diff
+      maxnet = max(maxval(svec(1,2,1:ns)), maxval(svec(1,3,1:ns)))
+      maxnet = max(maxnet, maxval(svec(1,1,1:ns)))
+      minnet = min(minval(svec(1,2,1:ns)), minval(svec(1,3,1:ns)))
+      minnet = min(maxnet, minval(svec(1,1,1:ns)))
+      diff = max(maxnet, 2d1)-max(minnet, 1d0)
+      print *,"diff ph:",diff
+      phaserub = 1d15
       do isn=1,ns
          do lvn=1,3
-            phi(lvn,isn)=phaserub*svec(1,lvn,isn)
+            phi(lvn,isn)=phaserub*2d1*max(svec(1,lvn,isn), 1d0)/diff
          enddo
       enddo
       return
@@ -427,9 +442,8 @@ c--look for current dump position
       subroutine clchm(area, step)
       use iolibsw
       integer in,iPIP2,iPIP3,iPIP3a,iPI3K,iPTEN,iMESS,iCURV,iThetaN
-      integer iVar
       real(8) step, PIPtc,PTENtc,PI3Ktc
-      real(8) PIP2m,PIP3m,PIP3a,PI3Km,PTENm,MESS,CURV,ThetaN,Var
+      real(8) PIP2m,PIP3m,PIP3a,PI3Km,PTENm,MESS,CURV,ThetaN
       real(8) PIP2,PI3K,PTEN,maxConc,new,area,val
       real(8) k1,k2,k3,k4,k5,k6,k7,k8,k9,k10,k11,k12
       real(8) ThetaEq,Theta0,tau_n
@@ -441,7 +455,6 @@ c--look for current dump position
       iPI3K = 8
       iMESS = 4
       iThetaN = 1
-      iVar = 2
 
       k1 = 4d-2
       k2 = 2d-14
@@ -457,7 +470,6 @@ c--look for current dump position
       k12 = 1d0 !Messenger decay rate = 1/tau_m
       tau_n = 1d0
       Theta0 = 1d-3
-      tautheta=2d0
 
 
       maxConc = 8.7816d13
@@ -490,18 +502,14 @@ c     1        "PIP2:",int(PIP2*area)
             PI3Km = svec(iPI3K,lvn,isn)
             MESS = svec(iMESS,lvn,isn)
             ThetaN = svec(iThetaN,lvn,isn)
-            Var = svec(iVar,lvn,isn)
 
             !Create network
             !ThetaEq=Theta0*(1d0+MESS)
             !sdot(iThetaN,lvn,isn) = (ThetaEq-ThetaN)*MESS/tau_n
             !sdkr(iThetaN,lvn,isn) = -MESS/tau_n
-            thetaeq=Theta0*(Var+1d0)
-            sdot(1,lvn,isn)=(thetaeq-ThetaN)/(tautheta/Var)
-            sdkr(1,lvn,isn)=-1d0/(tautheta/Var)
 
-            sdot(2,lvn,isn)=PIP2m*Mess-0.05*Var
-            sdkr(2,lvn,isn)=-0.05
+            sdot(1,lvn,isn)=1d-5*PIP2m*svec(4,lvn,isn)-0.05*ThetaN
+            sdkr(1,lvn,isn)=-0.05
 
             !Decay messenger
             sdot(4,lvn,isn)=(1d-4-svec(4,lvn,isn))/5d1
