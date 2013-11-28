@@ -102,6 +102,7 @@ c--look for current dump position
       call printFile(isuff, ipf, 0)
   10  call modriver(icyc,epsl,idebug)
       if (icyc.gt.10) goto 10
+      logInt = 40d0
   100 continue
          call avtstep(avdt)
          if (avdt.lt.1d-5) then
@@ -110,12 +111,13 @@ c--look for current dump position
          endif
          call clchm(area)
          call cmstpsiz(cmdt,1d-2)
-         tstp=min(cmdt(2), 30d0)
-         tstp=min(cmdt(4),tstp)
+         tstp=min(cmdt(2),cmdt(4))
          tstp=min(avdt,tstp)
-         time=time+tstp
-         print *,"time:",time,cmdt(2),cmdt(4),avdt
-         call dfdriver('eulerian')
+         if (tstp.ge.(tnext-time)) then
+            tstp=tnext-time
+            isve=1
+         endif
+         call dfdriver('lagrangian')
          call avgridmo('lagrangian',idebug)
          call avfield(1,'nw')
          call setPhaserub
@@ -132,8 +134,13 @@ c--look for current dump position
            call modriver(icyc,epsl,idebug)
            if (icyc.lt.10) exit
          enddo
-         isuff=isuff+1
-         call printFile(isuff, ipf, 0)
+         time=time+tstp
+         print *,"time:",time,tstp,cmdt(2),cmdt(4),avdt
+         if (isve.eq.1) then
+           call printFile(isuff,ipf,0)
+           tnext=tnext+logInt
+           isve=0
+         endif
          goto 100
    90 format(i3.3)
       stop
