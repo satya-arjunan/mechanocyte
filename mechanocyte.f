@@ -221,11 +221,11 @@ c--look for current dump position
       minnet = min(minval(svec(1,2,1:ns)), minval(svec(1,3,1:ns)))
       minnet = min(maxnet, minval(svec(1,1,1:ns)))
       diff = max(maxnet, 2d1)-max(minnet, 1d0)
-      print *,"diff vis:",diff
-      viscosity = 1d6
+      viscosity = 1d7
       do isn=1,ns
          do lvn=1,3
-            vis(lvn,isn)=viscosity*2d1*max(svec(1,lvn,isn), 1d0)/diff
+            !vis(lvn,isn)=viscosity*max(svec(1,lvn,isn), 1d0)/diff
+            vis(lvn,isn)=viscosity
          enddo
       enddo
       return
@@ -240,11 +240,11 @@ c--look for current dump position
       minnet = min(minval(svec(1,2,1:ns)), minval(svec(1,3,1:ns)))
       minnet = min(maxnet, minval(svec(1,1,1:ns)))
       diff = max(maxnet, 2d1)-max(minnet, 1d0)
-      print *,"diff ph:",diff
-      phaserub = 1d15
+      phaserub = 1d14
       do isn=1,ns
          do lvn=1,3
-            phi(lvn,isn)=phaserub*2d1*max(svec(1,lvn,isn), 1d0)/diff
+            !phi(lvn,isn)=phaserub*max(svec(1,lvn,isn), 1d0)/diff
+            phi(lvn,isn)=phaserub
          enddo
       enddo
       return
@@ -288,7 +288,7 @@ c--look for current dump position
                edge=edge+svec(iThetaN,lv,is)
             enddo
          enddo
-         sfre(il)=edge/6d0*1d-13
+         sfre(il)=edge/6d0*2d-8
       enddo
       return
       end subroutine setSurfaceForce
